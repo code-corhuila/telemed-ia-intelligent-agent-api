@@ -50,8 +50,9 @@ class StartPreConsultationServiceTest {
         assertThat(conversations.stored).containsValue(conversation);
         // The agent opens with a fixed greeting: no model call before the patient says anything.
         assertThat(messages.findByConversation(conversation.id()))
-                .extracting(Message::sender, Message::content)
-                .containsExactly(tuple(Sender.AGENT, StartPreConsultationService.OPENING_MESSAGE));
+                .extracting(Message::sender, Message::content, Message::idempotencyKey)
+                .containsExactly(tuple(Sender.AGENT, StartPreConsultationService.OPENING_MESSAGE,
+                        "opening-" + conversation.id()));
     }
 
     @Test
