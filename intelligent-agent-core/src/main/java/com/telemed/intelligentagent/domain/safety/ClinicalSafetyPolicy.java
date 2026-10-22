@@ -46,9 +46,14 @@ public final class ClinicalSafetyPolicy {
         return matchesAny(CLINICAL_REQUESTS, patientMessage);
     }
 
+    /** Whether a text the model wrote diagnoses, prescribes or indicates a treatment. */
+    public boolean crossesClinicalLine(String modelText) {
+        return matchesAny(CLINICAL_REPLIES, modelText);
+    }
+
     /** The model's reply as the patient may see it: bounded, or the boundary message. */
     public String safeReply(String modelReply) {
-        if (modelReply == null || modelReply.isBlank() || matchesAny(CLINICAL_REPLIES, modelReply)) {
+        if (modelReply == null || modelReply.isBlank() || crossesClinicalLine(modelReply)) {
             return BOUNDARY_MESSAGE;
         }
         String reply = modelReply.strip();
