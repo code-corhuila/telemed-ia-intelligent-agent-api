@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: telemed-ia-intelligent-agent-api
+
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+server:
+  port: ${PORT:8086}
+  shutdown: graceful
+
+  tomcat:
+    connection-timeout: ${HTTP_CONNECTION_TIMEOUT:5s}
+    keep-alive-timeout: ${HTTP_KEEP_ALIVE_TIMEOUT:60s}
+    max-keep-alive-requests: ${HTTP_MAX_KEEP_ALIVE_REQUESTS:100}
+
+# Health lives on its own port, never on the public one, and nothing else is exposed.
+management:
+  server:
+    port: ${MANAGEMENT_PORT:9086}
+
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+  endpoint:
+    health:
+      show-details: never
