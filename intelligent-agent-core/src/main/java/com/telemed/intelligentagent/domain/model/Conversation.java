@@ -5,10 +5,12 @@ import java.util.UUID;
 
 import static com.telemed.intelligentagent.domain.model.AgentDomainException.Reason.CONVERSATION_FINISHED;
 import static com.telemed.intelligentagent.domain.model.AgentDomainException.Reason.INVALID_CONVERSATION;
+import static com.telemed.intelligentagent.domain.model.AgentDomainException.Reason.QUESTION_LIMIT_REACHED;
 
 /**
  * A patient's pre-consultation for one appointment. The agent may ask at
- * most {@code questionLimit} questions; reaching the limit ends it.
+ * most {@code questionLimit} questions; once the patient answers the last
+ * one, it closes.
  * Same invariants as the agent-db validators.
  */
 public final class Conversation {
@@ -69,13 +71,26 @@ public final class Conversation {
         }
     }
 
-    /** The agent asked one more question; at the limit the conversation ends. */
-    public void recordAgentQuestion(Instant now) {
+    /** The agent asked one more question; the last one allowed stays open for the patient to answer. */
+    public void recordAgentQuestion() {
         ensureActive();
-        questionsAsked++;
-        if (questionsAsked == questionLimit) {
-            end(FinalizationReason.QUESTION_LIMIT_REACHED, now);
+        if (questionLimitReached()) {
+            throw new AgentDomainException(QUESTION_LIMIT_REACHED, "The agent has no questions left.");
         }
+        questionsAsked++;
+    }
+
+    public boolean questionLimitReached() {
+        return questionsAsked >= questionLimit;
+    }
+
+    /** The patient answered the last question allowed: nothing more may be asked. */
+    public void closeAtQuestionLimit(Instant now) {
+        ensureActive();
+        if (!questionLimitReached()) {
+            throw new AgentDomainException(QUESTION_LIMIT_REACHED, "The agent still has questions left.");
+        }
+        end(FinalizationReason.QUESTION_LIMIT_REACHED, now);
     }
 
     public void finish(Instant now) {

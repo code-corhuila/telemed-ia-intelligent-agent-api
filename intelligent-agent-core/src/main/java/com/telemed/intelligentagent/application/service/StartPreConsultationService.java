@@ -62,7 +62,8 @@ public class StartPreConsultationService implements StartPreConsultationUseCase 
 
         Conversation conversation = Conversation.start(patientId, appointmentId, questionLimit, now);
         conversations.save(conversation);
-        messages.save(Message.of(conversation.id(), Sender.AGENT, OPENING_MESSAGE, now));
+        messages.save(Message.of(conversation.id(), Sender.AGENT, "opening-" + conversation.id(), OPENING_MESSAGE,
+                now));
         return conversation;
     }
 }
