@@ -8,6 +8,8 @@ import org.springframework.boot.test.web.server.LocalManagementPort;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -26,6 +28,11 @@ class IntelligentAgentApplicationTest {
     @LocalManagementPort
     private int managementPort;
 
+    @DynamicPropertySource
+    static void identityPublicKey(DynamicPropertyRegistry registry) {
+        TestIdentityKeys.register(registry);
+    }
+
     @Test
     void reportsHealthOnTheManagementPortOnly() {
         ResponseEntity<String> health = http.getForEntity(
@@ -35,7 +42,9 @@ class IntelligentAgentApplicationTest {
 
         assertThat(health.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(health.getBody()).contains("\"status\":\"UP\"");
-        assertThat(healthOnPublicPort.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        // Not served on the public port: denied like any unknown path.
+        assertThat(healthOnPublicPort.getStatusCode().is4xxClientError()).isTrue();
+        assertThat(healthOnPublicPort.getBody()).doesNotContain("\"status\":\"UP\"");
     }
 
     @Test
@@ -43,6 +52,7 @@ class IntelligentAgentApplicationTest {
         ResponseEntity<String> env = http.getForEntity(
                 "http://localhost:" + managementPort + "/actuator/env", String.class);
 
-        assertThat(env.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(env.getStatusCode().is4xxClientError()).isTrue();
+        assertThat(env.getBody()).doesNotContain("propertySources");
     }
 }
