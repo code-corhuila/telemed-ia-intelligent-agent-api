@@ -6,9 +6,11 @@ import com.telemed.intelligentagent.application.port.out.AgentModelPort.AgentRep
 import com.telemed.intelligentagent.application.port.out.AgentModelPort.Turn;
 import com.telemed.intelligentagent.application.port.out.ConversationRepository;
 import com.telemed.intelligentagent.application.port.out.MessageRepository;
+import com.telemed.intelligentagent.application.port.out.SummaryRepository;
 import com.telemed.intelligentagent.domain.model.AgentDomainException;
 import com.telemed.intelligentagent.domain.model.Conversation;
 import com.telemed.intelligentagent.domain.model.Message;
+import com.telemed.intelligentagent.domain.model.PreConsultationSummary;
 import com.telemed.intelligentagent.domain.model.Sender;
 import com.telemed.intelligentagent.domain.safety.ClinicalSafetyPolicy;
 import com.telemed.intelligentagent.domain.safety.PatientMessagePolicy;
@@ -36,6 +38,8 @@ public class SendMessageService implements SendMessageUseCase {
 
     private final ConversationRepository conversations;
     private final MessageRepository messages;
+    private final SummaryRepository summaries;
+    private final PreConsultationSummarizer summarizer;
     private final AgentModelPort model;
     private final Clock clock;
     private final PatientMessagePolicy messagePolicy = new PatientMessagePolicy();
@@ -43,9 +47,12 @@ public class SendMessageService implements SendMessageUseCase {
     private final PersonalDataRedactor redactor = new PersonalDataRedactor();
 
     public SendMessageService(ConversationRepository conversations, MessageRepository messages,
+                              SummaryRepository summaries, PreConsultationSummarizer summarizer,
                               AgentModelPort model, Clock clock) {
         this.conversations = conversations;
         this.messages = messages;
+        this.summaries = summaries;
+        this.summarizer = summarizer;
         this.model = model;
         this.clock = clock;
     }
@@ -70,10 +77,15 @@ public class SendMessageService implements SendMessageUseCase {
         Instant repliedAt = clock.instant();
         Message agentMessage = Message.of(conversationId, Sender.AGENT, idempotencyKey, reply,
                 repliedAt.isAfter(now) ? repliedAt : now.plusMillis(1));
+        // A closed conversation is summarised before anything is stored, so a failure leaves nothing half done.
+        Optional<PreConsultationSummary> summary = conversation.isActive()
+                ? Optional.empty()
+                : Optional.of(summarizer.summarize(conversation, withTurn(history, patientMessage), now));
 
         messages.save(patientMessage);
         messages.save(agentMessage);
         conversations.save(conversation);
+        summary.ifPresent(summaries::save);
         return new AgentTurn(agentMessage, conversation);
     }
 
@@ -86,17 +98,21 @@ public class SendMessageService implements SendMessageUseCase {
             conversation.closeAtQuestionLimit(now);
             return CLOSING_MESSAGE;
         }
-        List<Turn> transcript = new ArrayList<>();
-        history.forEach(message -> transcript.add(redacted(message)));
-        transcript.add(redacted(patientMessage));
+        List<Turn> transcript = withTurn(history, patientMessage).stream().map(this::redacted).toList();
 
-        AgentReply reply = model.nextTurn(List.copyOf(transcript));
+        AgentReply reply = model.nextTurn(transcript);
         if (reply.enoughInformation()) {
             conversation.finish(now);
             return CLOSING_MESSAGE;
         }
         conversation.recordAgentQuestion();
         return safetyPolicy.safeReply(reply.message());
+    }
+
+    private static List<Message> withTurn(List<Message> history, Message patientMessage) {
+        List<Message> transcript = new ArrayList<>(history);
+        transcript.add(patientMessage);
+        return transcript;
     }
 
     private Turn redacted(Message message) {
