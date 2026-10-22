@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import static com.telemed.intelligentagent.domain.model.AgentDomainException.Reason.CONVERSATION_FINISHED;
 import static com.telemed.intelligentagent.domain.model.AgentDomainException.Reason.INVALID_CONVERSATION;
+import static com.telemed.intelligentagent.domain.model.AgentDomainException.Reason.QUESTION_LIMIT_REACHED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -51,15 +52,32 @@ class ConversationTest {
     }
 
     @Test
-    void countsTheAgentsQuestionsAndClosesAtTheLimit() {
+    void countsTheAgentsQuestionsUpToTheLimit() {
         Conversation conversation = Conversation.start(PATIENT, APPOINTMENT, 2, NOW);
 
-        conversation.recordAgentQuestion(NOW.plusSeconds(10));
+        conversation.recordAgentQuestion();
         assertThat(conversation.questionsAsked()).isEqualTo(1);
+        assertThat(conversation.questionLimitReached()).isFalse();
+
+        // The last question stays open: the patient still gets to answer it.
+        conversation.recordAgentQuestion();
+        assertThat(conversation.questionsAsked()).isEqualTo(2);
+        assertThat(conversation.questionLimitReached()).isTrue();
         assertThat(conversation.isActive()).isTrue();
 
-        conversation.recordAgentQuestion(NOW.plusSeconds(20));
-        assertThat(conversation.questionsAsked()).isEqualTo(2);
+        assertThatThrownBy(conversation::recordAgentQuestion)
+                .extracting("reason").isEqualTo(QUESTION_LIMIT_REACHED);
+    }
+
+    @Test
+    void closesOnlyOnceTheLimitIsReached() {
+        Conversation conversation = Conversation.start(PATIENT, APPOINTMENT, 1, NOW);
+        assertThatThrownBy(() -> conversation.closeAtQuestionLimit(NOW))
+                .extracting("reason").isEqualTo(QUESTION_LIMIT_REACHED);
+
+        conversation.recordAgentQuestion();
+        conversation.closeAtQuestionLimit(NOW.plusSeconds(20));
+
         assertThat(conversation.status()).isEqualTo(ConversationStatus.FINISHED);
         assertThat(conversation.finalizationReason()).isEqualTo(FinalizationReason.QUESTION_LIMIT_REACHED);
         assertThat(conversation.endedAt()).isEqualTo(NOW.plusSeconds(20));
@@ -68,7 +86,7 @@ class ConversationTest {
     @Test
     void finishesWhenThePatientIsDone() {
         Conversation conversation = Conversation.start(PATIENT, APPOINTMENT, 3, NOW);
-        conversation.recordAgentQuestion(NOW.plusSeconds(10));
+        conversation.recordAgentQuestion();
 
         conversation.finish(NOW.plusSeconds(30));
 
@@ -82,7 +100,7 @@ class ConversationTest {
         Conversation conversation = Conversation.start(PATIENT, APPOINTMENT, 3, NOW);
         conversation.finish(NOW.plusSeconds(30));
 
-        assertThatThrownBy(() -> conversation.recordAgentQuestion(NOW.plusSeconds(40)))
+        assertThatThrownBy(conversation::recordAgentQuestion)
                 .extracting("reason").isEqualTo(CONVERSATION_FINISHED);
         assertThatThrownBy(() -> conversation.finish(NOW.plusSeconds(50)))
                 .extracting("reason").isEqualTo(CONVERSATION_FINISHED);
