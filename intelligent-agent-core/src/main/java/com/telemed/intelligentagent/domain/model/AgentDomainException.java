@@ -7,7 +7,11 @@ public class AgentDomainException extends RuntimeException {
         INVALID_CONVERSATION,
         INVALID_MESSAGE,
         MESSAGE_TOO_LONG,
-        CONVERSATION_FINISHED
+        CONVERSATION_FINISHED,
+        APPOINTMENT_NOT_FOUND,
+        APPOINTMENT_NOT_ELIGIBLE,
+        PRECONSULTATION_ALREADY_EXISTS,
+        ACTIVE_PRECONSULTATION_EXISTS
     }
 
     private final Reason reason;
