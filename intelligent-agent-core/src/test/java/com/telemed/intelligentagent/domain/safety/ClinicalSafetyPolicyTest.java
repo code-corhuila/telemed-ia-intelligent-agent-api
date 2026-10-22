@@ -60,6 +60,13 @@ class ClinicalSafetyPolicyTest {
     }
 
     @Test
+    void tellsWhetherATextCrossesTheClinicalLine() {
+        assertThat(policy.crossesClinicalLine("Probablemente tiene migraña")).isTrue();
+        assertThat(policy.crossesClinicalLine("Dolor de cabeza desde hace dos días")).isFalse();
+        assertThat(policy.crossesClinicalLine(null)).isFalse();
+    }
+
+    @Test
     void keepsSafeFollowUpQuestions() {
         String reply = "¿Desde cuándo tienes el dolor y qué tan fuerte es del 1 al 10?";
 

@@ -35,8 +35,9 @@ class SendMessageServiceTest {
     private final InMemoryConversations conversations = new InMemoryConversations();
     private final InMemoryMessages messages = new InMemoryMessages();
     private final FakeModel model = new FakeModel();
-    private final SendMessageService service = new SendMessageService(conversations, messages, model,
-            Clock.fixed(NOW, ZoneOffset.UTC));
+    private final InMemorySummaries summaries = new InMemorySummaries();
+    private final SendMessageService service = new SendMessageService(conversations, messages, summaries,
+            new PreConsultationSummarizer(model), model, Clock.fixed(NOW, ZoneOffset.UTC));
 
     @Test
     void asksTheModelWithARedactedTranscriptAndStoresBothTurns() {
@@ -90,6 +91,7 @@ class SendMessageServiceTest {
         assertThat(turn.reply().content()).isEqualTo(SendMessageService.CLOSING_MESSAGE);
         assertThat(turn.conversation().status()).isEqualTo(ConversationStatus.FINISHED);
         assertThat(turn.conversation().finalizationReason()).isEqualTo(FinalizationReason.COMPLETED);
+        assertThat(summaries.findByConversation(conversation.id())).isPresent();
     }
 
     @Test
@@ -101,6 +103,8 @@ class SendMessageServiceTest {
 
         assertThat(turn.reply().content()).isEqualTo(SendMessageService.CLOSING_MESSAGE);
         assertThat(turn.conversation().finalizationReason()).isEqualTo(FinalizationReason.QUESTION_LIMIT_REACHED);
+        assertThat(summaries.findByConversation(conversation.id()))
+                .hasValueSatisfying(summary -> assertThat(summary.consultationReason()).isEqualTo("Dolor"));
         assertThat(model.calls).isZero();
     }
 
@@ -175,7 +179,7 @@ class SendMessageServiceTest {
 
         @Override
         public SummaryDraft summarize(List<Turn> transcript) {
-            throw new UnsupportedOperationException();
+            return new SummaryDraft("Dolor", null, null, null);
         }
     }
 }
