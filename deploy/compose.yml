@@ -1,0 +1,30 @@
+services:
+  intelligent-agent-api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+
+    ports:
+      - "${PORT:-8086}:8086"
+      # Health only from this machine.
+      - "127.0.0.1:${MANAGEMENT_PORT:-9086}:9086"
+
+    environment:
+      PORT: 8086
+      MANAGEMENT_PORT: 9086
+
+      JWT_ISSUER: ${JWT_ISSUER:-telemed-ia-identity-and-access}
+      # Path inside the container: the agent only verifies tokens.
+      JWT_PUBLIC_KEY_FILE: /run/secrets/jwt-public.pem
+
+    volumes:
+      - ${JWT_PUBLIC_KEY_HOST_FILE:?Set JWT_PUBLIC_KEY_HOST_FILE}:/run/secrets/jwt-public.pem:ro
+
+    # Shared network: the API gateway reaches this service as intelligent-agent-api:8086.
+    networks:
+      - platform
+
+networks:
+  platform:
+    external: true
+    name: platform
