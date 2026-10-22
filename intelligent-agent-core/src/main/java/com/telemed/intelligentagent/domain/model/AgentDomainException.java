@@ -6,6 +6,7 @@ public class AgentDomainException extends RuntimeException {
     public enum Reason {
         INVALID_CONVERSATION,
         INVALID_MESSAGE,
+        MESSAGE_TOO_LONG,
         CONVERSATION_FINISHED
     }
 
