@@ -27,3 +27,9 @@ management:
   endpoint:
     health:
       show-details: never
+
+# identity-api signs the tokens; the agent only verifies them with the public key.
+security:
+  jwt:
+    issuer: ${JWT_ISSUER:telemed-ia-identity-and-access}
+    public-key-file: ${JWT_PUBLIC_KEY_FILE:}
