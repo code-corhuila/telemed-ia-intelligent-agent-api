@@ -59,7 +59,7 @@ public class UseCaseConfiguration {
 
     @Bean
     GetPreConsultationUseCase getPreConsultation(ConversationRepository conversations,
-                                                 MessageRepository messages, SummaryRepository summaries) {
-        return new GetPreConsultationService(conversations, messages, summaries);
+                                                 MessageRepository messages) {
+        return new GetPreConsultationService(conversations, messages);
     }
 }

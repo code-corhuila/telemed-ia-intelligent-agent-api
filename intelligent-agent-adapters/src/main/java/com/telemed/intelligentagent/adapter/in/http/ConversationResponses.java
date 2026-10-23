@@ -3,23 +3,21 @@ package com.telemed.intelligentagent.adapter.in.http;
 import com.telemed.intelligentagent.application.port.in.GetPreConsultationUseCase.PreConsultationView;
 import com.telemed.intelligentagent.domain.model.Conversation;
 import com.telemed.intelligentagent.domain.model.Message;
-import com.telemed.intelligentagent.domain.model.PreConsultationSummary;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/** The contract's Conversation, Message and PreconsultationSummary (camelCase, UUIDs, RFC 3339 UTC). */
+/** The contract's Conversation and Message, as the patient may see them (camelCase, UUIDs, RFC 3339 UTC). */
 public final class ConversationResponses {
 
     private ConversationResponses() {
     }
 
-    /** The contract's Conversation plus its summary once finished, so the portal needs one call. */
+    /** The contract's Conversation. Never the summary: it goes to the professional only. */
     public record ConversationResponse(UUID id, UUID patientId, UUID appointmentId, Instant startDateTime,
                                        Instant endDateTime, String status, int questionLimit, int questionsAsked,
-                                       String finalizationReason, List<MessageResponse> messages,
-                                       SummaryResponse preconsultationSummary) {
+                                       String finalizationReason, List<MessageResponse> messages) {
 
         public static ConversationResponse of(PreConsultationView view) {
             Conversation conversation = view.conversation();
@@ -27,8 +25,7 @@ public final class ConversationResponses {
                     conversation.appointmentId(), conversation.startedAt(), conversation.endedAt(),
                     conversation.status().name(), conversation.questionLimit(), conversation.questionsAsked(),
                     conversation.finalizationReason() == null ? null : conversation.finalizationReason().name(),
-                    view.messages().stream().map(MessageResponse::of).toList(),
-                    view.summary().map(SummaryResponse::of).orElse(null));
+                    view.messages().stream().map(MessageResponse::of).toList());
         }
     }
 
@@ -37,17 +34,6 @@ public final class ConversationResponses {
 
         public static MessageResponse of(Message message) {
             return new MessageResponse(message.id(), message.sender().name(), message.content(), message.sentAt());
-        }
-    }
-
-    public record SummaryResponse(UUID id, UUID conversationId, UUID appointmentId, UUID patientId,
-                                  String consultationReason, String evolutionTime, String detailedSymptoms,
-                                  String relevantHistory, Instant createdAt) {
-
-        public static SummaryResponse of(PreConsultationSummary summary) {
-            return new SummaryResponse(summary.id(), summary.conversationId(), summary.appointmentId(),
-                    summary.patientId(), summary.consultationReason(), summary.evolutionTime(),
-                    summary.detailedSymptoms(), summary.relevantHistory(), summary.createdAt());
         }
     }
 }

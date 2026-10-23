@@ -1,12 +1,10 @@
 package com.telemed.intelligentagent.adapter.in.http;
 
 import com.telemed.intelligentagent.adapter.in.http.ConversationResponses.ConversationResponse;
-import com.telemed.intelligentagent.adapter.in.http.ConversationResponses.SummaryResponse;
 import com.telemed.intelligentagent.application.port.in.FinishPreConsultationUseCase;
 import com.telemed.intelligentagent.application.port.in.GetPreConsultationUseCase;
 import com.telemed.intelligentagent.application.port.in.SendMessageUseCase;
 import com.telemed.intelligentagent.application.port.in.SendMessageUseCase.AgentTurn;
-import com.telemed.intelligentagent.domain.model.PreConsultationSummary;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -44,7 +42,8 @@ public class TurnController {
     public record ReplyResponse(UUID id, String sender, String content, Instant sentAt, String conversationStatus) {
     }
 
-    public record FinishResponse(ConversationResponse conversation, SummaryResponse preconsultationSummary) {
+    /** The summary is generated and stored for the professional; the patient gets the finished conversation. */
+    public record FinishResponse(ConversationResponse conversation) {
     }
 
     // A retry with the same key gets the same reply without asking the model again.
@@ -60,7 +59,7 @@ public class TurnController {
     @PostMapping("/finish")
     public FinishResponse finish(@AuthenticationPrincipal Jwt token, @PathVariable UUID id) {
         UUID patient = CurrentPatient.of(token);
-        PreConsultationSummary summary = finish.finish(patient, id);
-        return new FinishResponse(ConversationResponse.of(get.get(patient, id)), SummaryResponse.of(summary));
+        finish.finish(patient, id);
+        return new FinishResponse(ConversationResponse.of(get.get(patient, id)));
     }
 }
