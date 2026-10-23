@@ -134,6 +134,13 @@ class GroqAgentModelTest {
 
         assertThat(model.nextTurn(TRANSCRIPT).message()).isEqualTo("¿Desde cuándo?");
         assertThat(requests).hasSize(3);
+
+        // gpt-oss may also emit a tool call nobody offered it: Groq's tool_use_failed.
+        statuses.add(new int[] {400});
+        errorBodies.add("{\"error\":{\"type\":\"invalid_request_error\",\"code\":\"tool_use_failed\"}}");
+        contents.add("{\"message\":\"¿Algo más?\",\"enoughInformation\":false}");
+        assertThat(model.nextTurn(TRANSCRIPT).message()).isEqualTo("¿Algo más?");
+        assertThat(requests).hasSize(5);
     }
 
     @Test
