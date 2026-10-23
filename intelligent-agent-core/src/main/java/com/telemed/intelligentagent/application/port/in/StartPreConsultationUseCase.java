@@ -7,6 +7,9 @@ import java.util.UUID;
 /** HU-06: the patient starts the pre-consultation of one of their appointments. */
 public interface StartPreConsultationUseCase {
 
-    /** {@code patientId} always comes from the caller's token, never from the request body. */
-    Conversation start(UUID patientId, UUID appointmentId);
+    /**
+     * {@code patientId} always comes from the caller's token, never from the request body.
+     * Retrying with the same {@code idempotencyKey} returns the conversation it already started.
+     */
+    Conversation start(UUID patientId, UUID appointmentId, String idempotencyKey);
 }

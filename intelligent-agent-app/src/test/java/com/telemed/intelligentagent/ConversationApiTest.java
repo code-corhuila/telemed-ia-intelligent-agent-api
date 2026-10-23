@@ -35,6 +35,8 @@ import static com.telemed.intelligentagent.domain.model.AgentDomainException.Rea
 import static com.telemed.intelligentagent.domain.model.AgentDomainException.Reason.APPOINTMENT_NOT_ELIGIBLE;
 import static com.telemed.intelligentagent.domain.model.AgentDomainException.Reason.APPOINTMENT_NOT_FOUND;
 import static com.telemed.intelligentagent.domain.model.AgentDomainException.Reason.CONVERSATION_NOT_FOUND;
+import static com.telemed.intelligentagent.domain.model.AgentDomainException.Reason.IDEMPOTENCY_KEY_REUSED;
+import static com.telemed.intelligentagent.domain.model.AgentDomainException.Reason.INVALID_IDEMPOTENCY_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -73,7 +75,7 @@ class ConversationApiTest {
     @Test
     void startsThePreConsultationOfTheAppointmentForThePatientInTheToken() {
         Conversation conversation = Conversation.start(PATIENT, APPOINTMENT, 8, NOW);
-        when(start.start(PATIENT, APPOINTMENT)).thenReturn(conversation);
+        when(start.start(PATIENT, APPOINTMENT, "start-key-0001")).thenReturn(conversation);
         when(get.get(PATIENT, conversation.id())).thenReturn(viewOf(conversation, Optional.empty()));
 
         // A patientId in the body is ignored: the patient is always the token's subject.
@@ -91,7 +93,8 @@ class ConversationApiTest {
                 .contains("\"questionLimit\":8", "\"questionsAsked\":0")
                 .contains("\"sender\":\"AGENT\"", "\"content\":\"¿Qué te trae?\"")
                 .contains("\"preconsultationSummary\":null");
-        verify(start).start(PATIENT, APPOINTMENT);
+        // The caller's Idempotency-Key reaches the use case, which replays a retried start.
+        verify(start).start(PATIENT, APPOINTMENT, "start-key-0001");
     }
 
     @Test
@@ -118,6 +121,10 @@ class ConversationApiTest {
                 "ACTIVE_PRECONSULTATION_EXISTS");
         assertStartFails(new AppointmentVerificationUnavailableException("x"), HttpStatus.SERVICE_UNAVAILABLE,
                 "SERVICE_UNAVAILABLE");
+        assertStartFails(new AgentDomainException(IDEMPOTENCY_KEY_REUSED, "x"), HttpStatus.CONFLICT,
+                "IDEMPOTENCY_KEY_REUSED");
+        assertStartFails(new AgentDomainException(INVALID_IDEMPOTENCY_KEY, "x"), HttpStatus.BAD_REQUEST,
+                "INVALID_IDEMPOTENCY_KEY");
     }
 
     @Test
@@ -154,7 +161,7 @@ class ConversationApiTest {
     }
 
     private void assertStartFails(RuntimeException failure, HttpStatus status, String error) {
-        doThrow(failure).when(start).start(any(), any());
+        doThrow(failure).when(start).start(any(), any(), any());
 
         ResponseEntity<String> response = post(BASE, "{\"appointmentId\":\"" + APPOINTMENT + "\"}");
 
