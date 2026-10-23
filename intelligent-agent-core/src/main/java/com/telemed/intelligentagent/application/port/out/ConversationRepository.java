@@ -10,6 +10,8 @@ public interface ConversationRepository {
 
     Optional<Conversation> findById(UUID id);
 
+    Optional<Conversation> findByAppointment(UUID appointmentId);
+
     boolean existsForAppointment(UUID appointmentId);
 
     boolean hasActiveFor(UUID patientId);
