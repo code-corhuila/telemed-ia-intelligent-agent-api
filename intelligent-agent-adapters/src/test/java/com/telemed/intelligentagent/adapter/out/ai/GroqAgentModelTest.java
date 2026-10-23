@@ -37,6 +37,7 @@ class GroqAgentModelTest {
     private final ObjectMapper json = new ObjectMapper();
     private final Deque<int[]> statuses = new ArrayDeque<>();
     private final Deque<String> contents = new ArrayDeque<>();
+    private final Deque<String> errorBodies = new ArrayDeque<>();
     private final List<JsonNode> requests = new ArrayList<>();
     private final List<String> authorizations = new ArrayList<>();
     private HttpServer server;
@@ -53,7 +54,7 @@ class GroqAgentModelTest {
                     ? json.writeValueAsString(json.createObjectNode().set("choices", json.createArrayNode()
                     .add(json.createObjectNode().set("message",
                             json.createObjectNode().put("content", contents.pop())))))
-                    : "{\"error\":{\"message\":\"unavailable\"}}";
+                    : errorBodies.isEmpty() ? "{\"error\":{\"message\":\"unavailable\"}}" : errorBodies.pop();
             byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
             exchange.sendResponseHeaders(status, bytes.length);
             exchange.getResponseBody().write(bytes);
@@ -120,6 +121,26 @@ class GroqAgentModelTest {
                 .isInstanceOf(AgentModelUnavailableException.class)
                 .hasMessageNotContaining(KEY);
         assertThat(requests).hasSize(3);
+    }
+
+    @Test
+    void retriesWhenTheModelGeneratedOutputGroqCouldNotParse() {
+        // Groq answers 400 for these, but they are the model's failure, not a bad request: another try may pass.
+        statuses.add(new int[] {400});
+        errorBodies.add("{\"error\":{\"type\":\"invalid_request_error\",\"code\":\"output_parse_failed\"}}");
+        statuses.add(new int[] {400});
+        errorBodies.add("{\"error\":{\"type\":\"invalid_request_error\",\"code\":\"json_validate_failed\"}}");
+        contents.add("{\"message\":\"¿Desde cuándo?\",\"enoughInformation\":false}");
+
+        assertThat(model.nextTurn(TRANSCRIPT).message()).isEqualTo("¿Desde cuándo?");
+        assertThat(requests).hasSize(3);
+
+        // gpt-oss may also emit a tool call nobody offered it: Groq's tool_use_failed.
+        statuses.add(new int[] {400});
+        errorBodies.add("{\"error\":{\"type\":\"invalid_request_error\",\"code\":\"tool_use_failed\"}}");
+        contents.add("{\"message\":\"¿Algo más?\",\"enoughInformation\":false}");
+        assertThat(model.nextTurn(TRANSCRIPT).message()).isEqualTo("¿Algo más?");
+        assertThat(requests).hasSize(5);
     }
 
     @Test

@@ -18,8 +18,9 @@ import static com.telemed.intelligentagent.domain.model.AgentDomainException.Rea
 
 /**
  * Builds the summary from a redacted transcript. A field that crosses the
- * clinical line is dropped; without a usable reason, the patient's first
- * (redacted) words stand in, as agent-db requires one.
+ * clinical line, or that is a request for a clinical decision, is dropped;
+ * without a usable reason, the patient's first (redacted) report stands in,
+ * as agent-db requires one.
  */
 public class PreConsultationSummarizer {
 
@@ -34,11 +35,14 @@ public class PreConsultationSummarizer {
     }
 
     public PreConsultationSummary summarize(Conversation conversation, List<Message> transcript, Instant now) {
+        // Everything the patient said reaches the model; the agent's boundary replies are only noise.
         List<Turn> turns = transcript.stream()
+                .filter(message -> !(message.sender() == Sender.AGENT
+                        && ClinicalSafetyPolicy.BOUNDARY_MESSAGE.equals(message.content())))
                 .map(message -> new Turn(message.sender(), redactor.redact(message.content())))
                 .toList();
-        Turn firstPatientTurn = turns.stream()
-                .filter(turn -> turn.sender() == Sender.PATIENT)
+        Turn firstReport = turns.stream()
+                .filter(turn -> turn.sender() == Sender.PATIENT && !safetyPolicy.asksForClinicalDecision(turn.text()))
                 .findFirst()
                 .orElseThrow(() -> new AgentDomainException(NOTHING_TO_SUMMARIZE,
                         "Tell the assistant why you are consulting before finishing."));
@@ -46,7 +50,7 @@ public class PreConsultationSummarizer {
         SummaryDraft draft = model.summarize(turns);
         String reason = safe(draft.consultationReason());
         if (reason == null) {
-            String words = firstPatientTurn.text().strip();
+            String words = firstReport.text().strip();
             reason = words.length() <= MAX_FALLBACK_REASON ? words : words.substring(0, MAX_FALLBACK_REASON);
         }
         return PreConsultationSummary.of(conversation, reason, safe(draft.evolutionTime()),
@@ -54,6 +58,7 @@ public class PreConsultationSummarizer {
     }
 
     private String safe(String field) {
-        return field == null || field.isBlank() || safetyPolicy.crossesClinicalLine(field) ? null : field;
+        return field == null || field.isBlank() || safetyPolicy.crossesClinicalLine(field)
+                || safetyPolicy.asksForClinicalDecision(field) ? null : field;
     }
 }
