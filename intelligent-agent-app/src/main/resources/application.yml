@@ -57,3 +57,9 @@ agent:
       timeout: ${GROQ_TIMEOUT:20s}
       attempts: ${GROQ_ATTEMPTS:3}
       backoff: ${GROQ_BACKOFF:300ms}
+
+# Week 11 log contract (CP2): one JSON line per event with trace_id, span_id and correlation_id.
+logging:
+  structured:
+    format:
+      console: com.telemed.intelligentagent.app.observability.ContractLogFormatter
