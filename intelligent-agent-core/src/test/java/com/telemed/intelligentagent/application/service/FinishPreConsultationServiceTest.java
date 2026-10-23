@@ -7,6 +7,7 @@ import com.telemed.intelligentagent.domain.model.FinalizationReason;
 import com.telemed.intelligentagent.domain.model.Message;
 import com.telemed.intelligentagent.domain.model.PreConsultationSummary;
 import com.telemed.intelligentagent.domain.model.Sender;
+import com.telemed.intelligentagent.domain.safety.ClinicalSafetyPolicy;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -114,6 +115,31 @@ class FinishPreConsultationServiceTest {
                 .extracting("reason").isEqualTo(CONVERSATION_NOT_FOUND);
         assertThat(conversation.isActive()).isTrue();
         assertThat(summaries.stored).isEmpty();
+    }
+
+    @Test
+    void leavesClinicalRequestsAndTheirBoundaryRepliesOutOfTheSummary() {
+        Conversation conversation = withPatientSaying("¿Qué medicamento puedo tomar?");
+        messages.save(Message.of(conversation.id(), Sender.AGENT, "turn-key-0001",
+                ClinicalSafetyPolicy.BOUNDARY_MESSAGE, NOW));
+        messages.save(Message.of(conversation.id(), Sender.PATIENT, "turn-key-0002", "Me duele la cabeza", NOW));
+        model.draft = new AgentModelPort.SummaryDraft(null, null, null, null);
+
+        PreConsultationSummary summary = service.finish(PATIENT, conversation.id());
+
+        // A request for a decision is not something the patient reported about their health.
+        assertThat(model.lastTranscript).extracting(AgentModelPort.Turn::text)
+                .containsExactly("¿Qué te trae?", "Me duele la cabeza");
+        assertThat(summary.consultationReason()).isEqualTo("Me duele la cabeza");
+    }
+
+    @Test
+    void hasNothingToSummariseWhenThePatientOnlyAskedForClinicalDecisions() {
+        Conversation conversation = withPatientSaying("¿Cuál es mi diagnóstico?");
+
+        assertThatThrownBy(() -> service.finish(PATIENT, conversation.id()))
+                .extracting("reason").isEqualTo(NOTHING_TO_SUMMARIZE);
+        assertThat(model.calls).isZero();
     }
 
     private Conversation withPatientSaying(String text) {
