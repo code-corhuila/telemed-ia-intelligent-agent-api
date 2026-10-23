@@ -25,6 +25,13 @@ class AgentInstructionsTest {
     }
 
     @Test
+    void letThePatientEndTheConversationWithoutRepeatingQuestions() {
+        assertThat(AgentInstructions.CONVERSATION)
+                .contains("nothing more to add")
+                .contains("Never repeat a question");
+    }
+
+    @Test
     void askForASummaryOfReportedFactsOnly() {
         assertThat(AgentInstructions.SUMMARY)
                 .contains("only what the patient said")
