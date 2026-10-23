@@ -33,3 +33,16 @@ security:
   jwt:
     issuer: ${JWT_ISSUER:telemed-ia-identity-and-access}
     public-key-file: ${JWT_PUBLIC_KEY_FILE:}
+
+# The scripted model needs no key; Groq needs GROQ_API_KEY, only ever from the environment.
+agent:
+  question-limit: ${AGENT_QUESTION_LIMIT:8}
+  model:
+    provider: ${AGENT_MODEL_PROVIDER:scripted}
+    groq:
+      base-url: ${GROQ_BASE_URL:https://api.groq.com/openai/v1}
+      api-key: ${GROQ_API_KEY:}
+      model: ${GROQ_MODEL:openai/gpt-oss-20b}
+      timeout: ${GROQ_TIMEOUT:20s}
+      attempts: ${GROQ_ATTEMPTS:3}
+      backoff: ${GROQ_BACKOFF:300ms}
