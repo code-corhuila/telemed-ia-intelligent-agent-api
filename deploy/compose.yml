@@ -4,8 +4,10 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile
 
+    # Only the gateway is published (Anexo G 5.6.1): patients reach the API through it.
+    expose:
+      - "8086"
     ports:
-      - "${PORT:-8086}:8086"
       # Health only from this machine.
       - "127.0.0.1:${MANAGEMENT_PORT:-9086}:9086"
 

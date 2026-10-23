@@ -35,7 +35,7 @@ curl http://localhost:9086/actuator/health      # {"status":"UP"}
 
 | Variable | Meaning |
 |---|---|
-| `PORT` / `MANAGEMENT_PORT` | API (8086) and health (9086) ports |
+| `PORT` / `MANAGEMENT_PORT` | API (8086, inside the `platform` network only; reach it through the gateway) and health (9086, localhost only) ports |
 | `JWT_ISSUER` | issuer of identity-api's tokens |
 | `JWT_PUBLIC_KEY_HOST_FILE` | identity-api's public key (PEM) on the host |
 
