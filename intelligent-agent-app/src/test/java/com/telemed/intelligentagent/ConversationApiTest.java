@@ -7,7 +7,6 @@ import com.telemed.intelligentagent.application.port.out.AppointmentVerification
 import com.telemed.intelligentagent.domain.model.AgentDomainException;
 import com.telemed.intelligentagent.domain.model.Conversation;
 import com.telemed.intelligentagent.domain.model.Message;
-import com.telemed.intelligentagent.domain.model.PreConsultationSummary;
 import com.telemed.intelligentagent.domain.model.Sender;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +24,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import static com.telemed.intelligentagent.TestIdentityKeys.IDENTITY;
@@ -76,7 +74,7 @@ class ConversationApiTest {
     void startsThePreConsultationOfTheAppointmentForThePatientInTheToken() {
         Conversation conversation = Conversation.start(PATIENT, APPOINTMENT, 8, NOW);
         when(start.start(PATIENT, APPOINTMENT, "start-key-0001")).thenReturn(conversation);
-        when(get.get(PATIENT, conversation.id())).thenReturn(viewOf(conversation, Optional.empty()));
+        when(get.get(PATIENT, conversation.id())).thenReturn(viewOf(conversation));
 
         // A patientId in the body is ignored: the patient is always the token's subject.
         ResponseEntity<String> response = post(BASE, """
@@ -92,7 +90,7 @@ class ConversationApiTest {
                 .contains("\"startDateTime\":\"2026-10-22T15:00:00.123Z\"")
                 .contains("\"questionLimit\":8", "\"questionsAsked\":0")
                 .contains("\"sender\":\"AGENT\"", "\"content\":\"¿Qué te trae?\"")
-                .contains("\"preconsultationSummary\":null");
+                .doesNotContain("preconsultationSummary");
         // The caller's Idempotency-Key reaches the use case, which replays a retried start.
         verify(start).start(PATIENT, APPOINTMENT, "start-key-0001");
     }
@@ -128,12 +126,10 @@ class ConversationApiTest {
     }
 
     @Test
-    void showsTheirOwnConversationWithItsSummaryOnceFinished() {
+    void showsTheirOwnFinishedConversationButNeverTheSummary() {
         Conversation conversation = Conversation.start(PATIENT, APPOINTMENT, 8, NOW);
         conversation.finish(NOW.plusSeconds(60));
-        PreConsultationSummary summary = PreConsultationSummary.of(conversation, "Dolor de cabeza", null, null,
-                null, NOW.plusSeconds(60));
-        PreConsultationView view = viewOf(conversation, Optional.of(summary));
+        PreConsultationView view = viewOf(conversation);
         when(get.get(PATIENT, conversation.id())).thenReturn(view);
         when(get.getByAppointment(PATIENT, APPOINTMENT)).thenReturn(view);
 
@@ -145,7 +141,8 @@ class ConversationApiTest {
         assertThat(byId.getBody())
                 .contains("\"status\":\"FINISHED\"", "\"finalizationReason\":\"COMPLETED\"")
                 .contains("\"endDateTime\":\"2026-10-22T15:01:00.123Z\"")
-                .contains("\"consultationReason\":\"Dolor de cabeza\"", "\"detailedSymptoms\":null");
+                // The summary goes to the professional only.
+                .doesNotContain("preconsultationSummary", "consultationReason");
         assertThat(byAppointment.getBody()).isEqualTo(byId.getBody());
     }
 
@@ -184,9 +181,9 @@ class ConversationApiTest {
         return http.exchange(path, method, new HttpEntity<>(body, headers), String.class);
     }
 
-    private static PreConsultationView viewOf(Conversation conversation, Optional<PreConsultationSummary> summary) {
+    private static PreConsultationView viewOf(Conversation conversation) {
         Message opening = Message.of(conversation.id(), Sender.AGENT, "opening-" + conversation.id(),
                 "¿Qué te trae?", NOW);
-        return new PreConsultationView(conversation, List.of(opening), summary);
+        return new PreConsultationView(conversation, List.of(opening));
     }
 }

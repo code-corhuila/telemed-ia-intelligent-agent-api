@@ -7,10 +7,12 @@ import com.telemed.intelligentagent.application.port.in.StartPreConsultationUseC
 import com.telemed.intelligentagent.application.port.out.AppointmentVerificationUnavailableException;
 import com.telemed.intelligentagent.application.port.out.ConversationRepository;
 import com.telemed.intelligentagent.application.port.out.MessageRepository;
+import com.telemed.intelligentagent.application.port.out.SummaryRepository;
 import com.telemed.intelligentagent.application.port.out.UnitOfWork;
 import com.telemed.intelligentagent.domain.model.Conversation;
 import com.telemed.intelligentagent.domain.model.ConversationStatus;
 import com.telemed.intelligentagent.domain.model.Message;
+import com.telemed.intelligentagent.domain.model.PreConsultationSummary;
 import com.telemed.intelligentagent.domain.model.Sender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,6 +53,8 @@ class PersistenceWiringTest {
     private ConversationRepository conversations;
     @Autowired
     private MessageRepository messages;
+    @Autowired
+    private SummaryRepository summaries;
     @Autowired
     private UnitOfWork unitOfWork;
     @Autowired
@@ -99,9 +103,9 @@ class PersistenceWiringTest {
         GetPreConsultationUseCase.PreConsultationView view = get.get(PATIENT, conversation.id());
         assertThat(view.conversation().status()).isEqualTo(ConversationStatus.FINISHED);
         assertThat(view.messages()).hasSize(11);
-        assertThat(view.summary()).hasValueSatisfying(
-                summary -> assertThat(summary.consultationReason()).isEqualTo("Me duele la cabeza"));
-        assertThat(finish.finish(PATIENT, conversation.id())).isEqualTo(view.summary().orElseThrow());
+        PreConsultationSummary summary = summaries.findByConversation(conversation.id()).orElseThrow();
+        assertThat(summary.consultationReason()).isEqualTo("Me duele la cabeza");
+        assertThat(finish.finish(PATIENT, conversation.id())).isEqualTo(summary);
         assertThat(mongo.getCollection("outbox_events").countDocuments()).isEqualTo(1);
     }
 
