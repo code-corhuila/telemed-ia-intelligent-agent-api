@@ -4,6 +4,7 @@ import com.telemed.intelligentagent.application.port.in.FinishPreConsultationUse
 import com.telemed.intelligentagent.application.port.out.ConversationRepository;
 import com.telemed.intelligentagent.application.port.out.MessageRepository;
 import com.telemed.intelligentagent.application.port.out.SummaryRepository;
+import com.telemed.intelligentagent.application.port.out.UnitOfWork;
 import com.telemed.intelligentagent.domain.model.AgentDomainException;
 import com.telemed.intelligentagent.domain.model.Conversation;
 import com.telemed.intelligentagent.domain.model.PreConsultationSummary;
@@ -22,15 +23,17 @@ public class FinishPreConsultationService implements FinishPreConsultationUseCas
     private final MessageRepository messages;
     private final SummaryRepository summaries;
     private final PreConsultationSummarizer summarizer;
+    private final UnitOfWork unitOfWork;
     private final Clock clock;
 
     public FinishPreConsultationService(ConversationRepository conversations, MessageRepository messages,
                                         SummaryRepository summaries, PreConsultationSummarizer summarizer,
-                                        Clock clock) {
+                                        UnitOfWork unitOfWork, Clock clock) {
         this.conversations = conversations;
         this.messages = messages;
         this.summaries = summaries;
         this.summarizer = summarizer;
+        this.unitOfWork = unitOfWork;
         this.clock = clock;
     }
 
@@ -49,8 +52,10 @@ public class FinishPreConsultationService implements FinishPreConsultationUseCas
         PreConsultationSummary summary = summarizer.summarize(conversation,
                 messages.findByConversation(conversationId), now);
         conversation.finish(now);
-        conversations.save(conversation);
-        summaries.save(summary);
+        unitOfWork.execute(() -> {
+            conversations.save(conversation);
+            summaries.save(summary);
+        });
         return summary;
     }
 }

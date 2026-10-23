@@ -7,6 +7,7 @@ import com.telemed.intelligentagent.application.port.out.AgentModelPort.Turn;
 import com.telemed.intelligentagent.application.port.out.ConversationRepository;
 import com.telemed.intelligentagent.application.port.out.MessageRepository;
 import com.telemed.intelligentagent.application.port.out.SummaryRepository;
+import com.telemed.intelligentagent.application.port.out.UnitOfWork;
 import com.telemed.intelligentagent.domain.model.AgentDomainException;
 import com.telemed.intelligentagent.domain.model.Conversation;
 import com.telemed.intelligentagent.domain.model.Message;
@@ -41,6 +42,7 @@ public class SendMessageService implements SendMessageUseCase {
     private final SummaryRepository summaries;
     private final PreConsultationSummarizer summarizer;
     private final AgentModelPort model;
+    private final UnitOfWork unitOfWork;
     private final Clock clock;
     private final PatientMessagePolicy messagePolicy = new PatientMessagePolicy();
     private final ClinicalSafetyPolicy safetyPolicy = new ClinicalSafetyPolicy();
@@ -48,12 +50,13 @@ public class SendMessageService implements SendMessageUseCase {
 
     public SendMessageService(ConversationRepository conversations, MessageRepository messages,
                               SummaryRepository summaries, PreConsultationSummarizer summarizer,
-                              AgentModelPort model, Clock clock) {
+                              AgentModelPort model, UnitOfWork unitOfWork, Clock clock) {
         this.conversations = conversations;
         this.messages = messages;
         this.summaries = summaries;
         this.summarizer = summarizer;
         this.model = model;
+        this.unitOfWork = unitOfWork;
         this.clock = clock;
     }
 
@@ -82,10 +85,12 @@ public class SendMessageService implements SendMessageUseCase {
                 ? Optional.empty()
                 : Optional.of(summarizer.summarize(conversation, withTurn(history, patientMessage), now));
 
-        messages.save(patientMessage);
-        messages.save(agentMessage);
-        conversations.save(conversation);
-        summary.ifPresent(summaries::save);
+        unitOfWork.execute(() -> {
+            messages.save(patientMessage);
+            messages.save(agentMessage);
+            conversations.save(conversation);
+            summary.ifPresent(summaries::save);
+        });
         return new AgentTurn(agentMessage, conversation);
     }
 
