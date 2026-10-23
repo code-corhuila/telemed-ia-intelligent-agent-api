@@ -84,6 +84,12 @@ class ScriptedAgentModelTest {
     }
 
     @Test
+    void asksAtLeastTheAgentsDefaultMinimumOfQuestions() {
+        // Fewer would leave the scripted model unable to close under AGENT_MINIMUM_QUESTIONS=4.
+        assertThat(ScriptedAgentModel.QUESTIONS).hasSizeGreaterThanOrEqualTo(4);
+    }
+
+    @Test
     void neverSaysAnythingTheSafetyPolicyWouldBlock() {
         ClinicalSafetyPolicy policy = new ClinicalSafetyPolicy();
 
