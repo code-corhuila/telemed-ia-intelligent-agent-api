@@ -8,6 +8,8 @@ import com.telemed.intelligentagent.application.port.out.AgentModelPort;
 import com.telemed.intelligentagent.application.port.out.AgentModelUnavailableException;
 import com.telemed.intelligentagent.domain.model.Sender;
 import com.telemed.intelligentagent.domain.safety.AgentInstructions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
@@ -16,6 +18,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -26,6 +29,9 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class GroqAgentModel implements AgentModelPort {
 
+    private static final Logger LOG = LoggerFactory.getLogger(GroqAgentModel.class);
+    // Groq's 400s for structured output the model produced badly; the request itself was fine.
+    private static final Set<String> UNPARSABLE_GENERATION = Set.of("output_parse_failed", "json_validate_failed");
     private static final int TURN_MAX_TOKENS = 300;
     private static final int SUMMARY_MAX_TOKENS = 450;
 
@@ -103,7 +109,10 @@ public class GroqAgentModel implements AgentModelPort {
         }
     }
 
-    /** Bounded retries with full-jitter backoff, only for network errors, 429 and 5xx. */
+    /**
+     * Bounded retries with full-jitter backoff, only for network errors, 429,
+     * 5xx and output the model generated but Groq could not parse.
+     */
     private JsonNode send(ObjectNode body) {
         HttpRequest request = HttpRequest.newBuilder(endpoint)
                 .timeout(timeout)
@@ -118,8 +127,13 @@ public class GroqAgentModel implements AgentModelPort {
                 if (response.statusCode() == 200) {
                     return json.readTree(response.body());
                 }
-                retryable = response.statusCode() == 429 || response.statusCode() >= 500;
+                String errorCode = errorCode(response.body());
+                // Status and Groq's error code only: the body may echo the patient's words.
+                LOG.warn("AI provider answered {} ({}) on attempt {}", response.statusCode(), errorCode, attempt);
+                retryable = response.statusCode() == 429 || response.statusCode() >= 500
+                        || UNPARSABLE_GENERATION.contains(errorCode);
             } catch (IOException e) {
+                LOG.warn("AI provider unreachable on attempt {}: {}", attempt, e.getClass().getSimpleName());
                 retryable = true;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -129,6 +143,14 @@ public class GroqAgentModel implements AgentModelPort {
                 throw new AgentModelUnavailableException("The AI provider is not available right now.");
             }
             pause(attempt);
+        }
+    }
+
+    private String errorCode(String body) {
+        try {
+            return json.readTree(body).path("error").path("code").asText("none");
+        } catch (IOException | RuntimeException notJson) {
+            return "none";
         }
     }
 
