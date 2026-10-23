@@ -26,6 +26,7 @@ class HttpAppointmentsTest {
     private static final String PATIENT_TOKEN = "patient.jwt.token";
     private static final UUID APPOINTMENT = UUID.randomUUID();
     private static final UUID PATIENT = UUID.randomUUID();
+    private static final UUID PROFESSIONAL = UUID.randomUUID();
 
     private final List<String> paths = new ArrayList<>();
     private final List<String> authorizations = new ArrayList<>();
@@ -70,7 +71,7 @@ class HttpAppointmentsTest {
         // Token relay: the agent holds no privilege of its own over appointments.
         assertThat(authorizations).containsExactly("Bearer " + PATIENT_TOKEN);
         assertThat(paths).containsExactly("/api/appointments/" + APPOINTMENT);
-        assertThat(appointment).isEqualTo(new Appointment(APPOINTMENT, PATIENT, AppointmentStatus.RESCHEDULED,
+        assertThat(appointment).isEqualTo(new Appointment(APPOINTMENT, PATIENT, PROFESSIONAL, AppointmentStatus.RESCHEDULED,
                 Instant.parse("2026-11-03T14:00:00Z")));
     }
 
@@ -123,6 +124,6 @@ class HttpAppointmentsTest {
                 {"id":"%s","patientId":"%s","professionalId":"%s","preconsultationSummaryId":null,
                  "postSummaryId":null,"start":"2026-11-03T14:00:00Z","end":"2026-11-03T14:30:00Z",
                  "status":"%s","cancellationReason":null,"createdAt":"2026-10-22T15:00:00Z",
-                 "updatedAt":"2026-10-22T15:00:00Z"}""".formatted(APPOINTMENT, PATIENT, UUID.randomUUID(), status);
+                 "updatedAt":"2026-10-22T15:00:00Z"}""".formatted(APPOINTMENT, PATIENT, PROFESSIONAL, status);
     }
 }

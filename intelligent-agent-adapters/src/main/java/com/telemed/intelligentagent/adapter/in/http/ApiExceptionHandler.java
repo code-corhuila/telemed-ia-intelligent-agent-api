@@ -33,7 +33,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(AgentDomainException.class)
     ResponseEntity<ApiErrorResponse> domainRule(AgentDomainException exception, HttpServletRequest request) {
         HttpStatus status = switch (exception.reason()) {
-            case APPOINTMENT_NOT_FOUND, CONVERSATION_NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case APPOINTMENT_NOT_FOUND, CONVERSATION_NOT_FOUND, SUMMARY_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case APPOINTMENT_NOT_ELIGIBLE -> HttpStatus.UNPROCESSABLE_ENTITY;
             case PRECONSULTATION_ALREADY_EXISTS, ACTIVE_PRECONSULTATION_EXISTS, CONVERSATION_FINISHED,
                  QUESTION_LIMIT_REACHED, NOTHING_TO_SUMMARIZE, IDEMPOTENCY_KEY_REUSED -> HttpStatus.CONFLICT;
@@ -53,7 +53,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 "The pre-consultation is not available right now. Try again in a moment.", List.of(), request);
     }
 
-    @ExceptionHandler(CurrentPatient.InvalidSubjectException.class)
+    @ExceptionHandler(TokenSubject.InvalidSubjectException.class)
     ResponseEntity<ApiErrorResponse> invalidSubject(HttpServletRequest request) {
         return error(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Missing or invalid credentials.", List.of(), request);
     }
