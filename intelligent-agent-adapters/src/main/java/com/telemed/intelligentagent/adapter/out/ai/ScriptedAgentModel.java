@@ -20,7 +20,10 @@ public class ScriptedAgentModel implements AgentModelPort {
 
     @Override
     public AgentReply nextTurn(List<Turn> transcript) {
-        int asked = (int) transcript.stream().filter(turn -> turn.sender() == Sender.AGENT).count();
+        // Only its own questions count: the opening and boundary replies are agent turns too.
+        int asked = (int) transcript.stream()
+                .filter(turn -> turn.sender() == Sender.AGENT && QUESTIONS.contains(turn.text()))
+                .count();
         if (asked >= QUESTIONS.size()) {
             return new AgentReply("Gracias, ya tengo la información para tu médico.", true);
         }
