@@ -36,8 +36,26 @@ class SendMessageServiceTest {
     private final InMemoryMessages messages = new InMemoryMessages();
     private final FakeModel model = new FakeModel();
     private final InMemorySummaries summaries = new InMemorySummaries();
+    private final TestUnitOfWork unitOfWork = new TestUnitOfWork();
     private final SendMessageService service = new SendMessageService(conversations, messages, summaries,
-            new PreConsultationSummarizer(model), model, Clock.fixed(NOW, ZoneOffset.UTC));
+            new PreConsultationSummarizer(model), model, unitOfWork, Clock.fixed(NOW, ZoneOffset.UTC));
+
+    @Test
+    void storesTheTurnAndTheSummaryInOneUnitOfWorkAfterTheModelAnswers() {
+        Conversation conversation = started(3);
+        model.next = new AgentModelPort.AgentReply("¿Algo más?", true);
+        unitOfWork.defer();
+
+        service.send(PATIENT, conversation.id(), KEY, "Eso es todo");
+        assertThat(model.calls).isEqualTo(1);
+        assertThat(messages.stored).hasSize(1);
+        assertThat(summaries.stored).isEmpty();
+
+        unitOfWork.commit();
+        assertThat(unitOfWork.units).isEqualTo(1);
+        assertThat(messages.stored).hasSize(3);
+        assertThat(summaries.stored).hasSize(1);
+    }
 
     @Test
     void asksTheModelWithARedactedTranscriptAndStoresBothTurns() {
