@@ -79,12 +79,12 @@ class PersistenceWiringTest {
         messages.save(Message.of(conversation.id(), Sender.AGENT, "opening-" + conversation.id(), "¿Qué te trae?",
                 Instant.now()));
 
-        List.of("Me duele la cabeza", "Desde hace dos días", "Un 6 de 10", "Tengo migraña")
+        List.of("Me duele la cabeza", "Desde hace dos días", "Un 6 de 10", "Tengo migraña", "Nada más")
                 .forEach(text -> send.send(PATIENT, conversation.id(), UUID.randomUUID().toString(), text));
 
         GetPreConsultationUseCase.PreConsultationView view = get.get(PATIENT, conversation.id());
         assertThat(view.conversation().status()).isEqualTo(ConversationStatus.FINISHED);
-        assertThat(view.messages()).hasSize(9);
+        assertThat(view.messages()).hasSize(11);
         assertThat(view.summary()).hasValueSatisfying(
                 summary -> assertThat(summary.consultationReason()).isEqualTo("Me duele la cabeza"));
         assertThat(finish.finish(PATIENT, conversation.id())).isEqualTo(view.summary().orElseThrow());

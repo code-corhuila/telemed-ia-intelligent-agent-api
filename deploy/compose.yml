@@ -24,6 +24,7 @@ services:
       APPOINTMENTS_BASE_URL: ${APPOINTMENTS_BASE_URL:-http://appointment-scheduling-api:8080}
 
       AGENT_QUESTION_LIMIT: ${AGENT_QUESTION_LIMIT:-8}
+      AGENT_MINIMUM_QUESTIONS: ${AGENT_MINIMUM_QUESTIONS:-4}
       # scripted (no key) or groq (needs GROQ_API_KEY from the gitignored .env).
       AGENT_MODEL_PROVIDER: ${AGENT_MODEL_PROVIDER:-scripted}
       GROQ_API_KEY: ${GROQ_API_KEY:-}

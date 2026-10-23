@@ -28,6 +28,7 @@ class AgentModelConfigurationTest {
             assertThat(app).hasSingleBean(AgentModelPort.class);
             assertThat(app.getBean(AgentModelPort.class)).isInstanceOf(ScriptedAgentModel.class);
             assertThat(app.getBean(AgentProperties.class).questionLimit()).isEqualTo(8);
+            assertThat(app.getBean(AgentProperties.class).minimumQuestions()).isEqualTo(4);
             assertThat(app.getBean(Clock.class).getZone()).isEqualTo(ZoneOffset.UTC);
         });
     }
@@ -48,6 +49,12 @@ class AgentModelConfigurationTest {
     void refusesAnUnboundedQuestionLimit() {
         context.withPropertyValues("agent.question-limit=0").run(app -> assertThat(app).hasFailed());
         context.withPropertyValues("agent.question-limit=50").run(app -> assertThat(app).hasFailed());
+    }
+
+    @Test
+    void refusesAMinimumAboveTheQuestionLimit() {
+        context.withPropertyValues("agent.question-limit=4", "agent.minimum-questions=5")
+                .run(app -> assertThat(app).hasFailed());
     }
 
     @Test

@@ -15,7 +15,8 @@ public class ScriptedAgentModel implements AgentModelPort {
     static final List<String> QUESTIONS = List.of(
             "Gracias por contarme. ¿Desde cuándo lo sientes?",
             "¿Qué tan intenso es, del 1 al 10, y has notado otros síntomas?",
-            "¿Tienes alguna condición de salud o antecedente que tu médico deba conocer?"
+            "¿Tienes alguna condición de salud o antecedente que tu médico deba conocer?",
+            "¿Hay algo más que quieras que tu médico sepa antes de la cita?"
     );
 
     @Override
