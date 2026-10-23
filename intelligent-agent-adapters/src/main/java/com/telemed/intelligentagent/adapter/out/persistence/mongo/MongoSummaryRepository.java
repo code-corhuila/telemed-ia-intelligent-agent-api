@@ -43,8 +43,16 @@ public class MongoSummaryRepository implements SummaryRepository {
 
     @Override
     public Optional<PreConsultationSummary> findByConversation(UUID conversationId) {
-        Query query = Query.query(Criteria.where("conversationId").is(conversationId.toString()));
-        return Optional.ofNullable(mongo.findOne(query, Document.class, COLLECTION))
+        return findOne(Criteria.where("conversationId").is(conversationId.toString()));
+    }
+
+    @Override
+    public Optional<PreConsultationSummary> findByAppointment(UUID appointmentId) {
+        return findOne(Criteria.where("appointmentId").is(appointmentId.toString()));
+    }
+
+    private Optional<PreConsultationSummary> findOne(Criteria criteria) {
+        return Optional.ofNullable(mongo.findOne(Query.query(criteria), Document.class, COLLECTION))
                 .map(MongoSummaryRepository::toSummary);
     }
 

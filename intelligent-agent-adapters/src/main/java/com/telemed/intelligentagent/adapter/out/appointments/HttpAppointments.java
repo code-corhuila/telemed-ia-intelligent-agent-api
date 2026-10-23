@@ -78,6 +78,7 @@ public class HttpAppointments implements AppointmentsPort {
             return new Appointment(
                     UUID.fromString(node.get("id").asText()),
                     UUID.fromString(node.get("patientId").asText()),
+                    UUID.fromString(node.get("professionalId").asText()),
                     AppointmentStatus.valueOf(node.get("status").asText()),
                     Instant.parse(node.get("start").asText()));
         } catch (IOException | RuntimeException unreadable) {

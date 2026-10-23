@@ -13,5 +13,8 @@ public interface SummaryRepository {
 
     Optional<PreConsultationSummary> findByConversation(UUID conversationId);
 
+    /** At most one: agent-db keeps one summary per appointment (uq_summaries_appointment). */
+    Optional<PreConsultationSummary> findByAppointment(UUID appointmentId);
+
     void save(PreConsultationSummary summary);
 }

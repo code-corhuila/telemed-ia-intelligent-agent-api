@@ -33,7 +33,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(AgentDomainException.class)
     ResponseEntity<ApiErrorResponse> domainRule(AgentDomainException exception, HttpServletRequest request) {
         HttpStatus status = switch (exception.reason()) {
-            case APPOINTMENT_NOT_FOUND, CONVERSATION_NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case APPOINTMENT_NOT_FOUND, CONVERSATION_NOT_FOUND, SUMMARY_NOT_FOUND -> HttpStatus.NOT_FOUND;
             case APPOINTMENT_NOT_ELIGIBLE -> HttpStatus.UNPROCESSABLE_ENTITY;
             case PRECONSULTATION_ALREADY_EXISTS, ACTIVE_PRECONSULTATION_EXISTS, CONVERSATION_FINISHED,
                  QUESTION_LIMIT_REACHED, NOTHING_TO_SUMMARIZE, IDEMPOTENCY_KEY_REUSED -> HttpStatus.CONFLICT;

@@ -12,6 +12,7 @@ public class AgentDomainException extends RuntimeException {
         CONVERSATION_NOT_FOUND,
         NOTHING_TO_SUMMARIZE,
         INVALID_SUMMARY,
+        SUMMARY_NOT_FOUND,
         INVALID_IDEMPOTENCY_KEY,
         IDEMPOTENCY_KEY_REUSED,
         APPOINTMENT_NOT_FOUND,
