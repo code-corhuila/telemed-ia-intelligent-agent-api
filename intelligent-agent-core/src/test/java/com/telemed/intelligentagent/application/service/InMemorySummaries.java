@@ -19,6 +19,11 @@ class InMemorySummaries implements SummaryRepository {
     }
 
     @Override
+    public Optional<PreConsultationSummary> findByAppointment(UUID appointmentId) {
+        return stored.stream().filter(s -> s.appointmentId().equals(appointmentId)).findFirst();
+    }
+
+    @Override
     public void save(PreConsultationSummary summary) {
         stored.add(summary);
     }

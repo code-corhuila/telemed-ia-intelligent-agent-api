@@ -52,6 +52,15 @@ class MongoSummaryRepositoryTest {
     }
 
     @Test
+    void findsTheSummaryOfAnAppointment() {
+        PreConsultationSummary summary = summary("Dolor de cabeza", null);
+        repository.save(summary);
+
+        assertThat(repository.findByAppointment(conversation.appointmentId())).contains(summary);
+        assertThat(repository.findByAppointment(UUID.randomUUID())).isEmpty();
+    }
+
+    @Test
     void recordsThePreConsultationSummaryGeneratedEvent() {
         PreConsultationSummary summary = summary("Dolor de cabeza", null);
         repository.save(summary);
