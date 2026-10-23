@@ -32,6 +32,8 @@ public final class AgentInstructions {
             Set enoughInformation to true only when you already know the reason, the onset, how it
             has evolved, how intense it is, the related symptoms, and the patient's relevant history
             (chronic conditions and allergies). Until then, set enoughInformation to false.
+            If the patient says they have nothing more to add, set enoughInformation to true.
+            Never repeat a question the patient already answered or chose not to answer.
             """;
 
     public static final String SUMMARY = """
