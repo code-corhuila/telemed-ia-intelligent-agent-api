@@ -91,6 +91,20 @@ class GroqAgentModelTest {
     }
 
     @Test
+    void leavesRoomForTheModelsReasoningBeforeItsAnswer() {
+        contents.add("{\"message\":\"¿Desde cuándo?\",\"enoughInformation\":false}");
+        contents.add("{\"consultationReason\":\"Dolor\",\"evolutionTime\":null,"
+                + "\"detailedSymptoms\":null,\"relevantHistory\":null}");
+
+        model.nextTurn(TRANSCRIPT);
+        model.summarize(TRANSCRIPT);
+
+        // gpt-oss reasons first (measured up to ~300 tokens) within the same budget; a short one truncates the JSON.
+        assertThat(requests.get(0).get("max_completion_tokens").asInt()).isGreaterThanOrEqualTo(1024);
+        assertThat(requests.get(1).get("max_completion_tokens").asInt()).isGreaterThanOrEqualTo(1536);
+    }
+
+    @Test
     void summarisesWithNullsForWhatThePatientDidNotSay() {
         contents.add("{\"consultationReason\":\"Dolor de cabeza\",\"evolutionTime\":\"Hace 2 días\","
                 + "\"detailedSymptoms\":null,\"relevantHistory\":null}");
