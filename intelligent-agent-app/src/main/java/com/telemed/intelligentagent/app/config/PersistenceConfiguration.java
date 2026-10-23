@@ -1,5 +1,6 @@
 package com.telemed.intelligentagent.app.config;
 
+import com.telemed.intelligentagent.adapter.in.http.TraceIds;
 import com.telemed.intelligentagent.adapter.out.persistence.mongo.MongoConversationRepository;
 import com.telemed.intelligentagent.adapter.out.persistence.mongo.MongoIdempotencyRecords;
 import com.telemed.intelligentagent.adapter.out.persistence.mongo.MongoMessageRepository;
@@ -18,7 +19,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.Duration;
-import java.util.UUID;
 
 /** agent-db through MONGODB_URI (intelligent_agent_app user); a unit of work is a Mongo transaction. */
 @Configuration(proxyBeanMethods = false)
@@ -55,9 +55,9 @@ public class PersistenceConfiguration {
         return new MongoMessageRepository(mongo);
     }
 
-    // Until the HTTP layer hands over the request's correlation id, each event gets its own.
+    // Each outbox event carries the X-Correlation-Id of the request that produced it.
     @Bean
     SummaryRepository summaryRepository(MongoTemplate mongo, TransactionTemplate transaction, Clock clock) {
-        return new MongoSummaryRepository(mongo, transaction, clock, UUID::randomUUID);
+        return new MongoSummaryRepository(mongo, transaction, clock, TraceIds::currentAsUuid);
     }
 }
