@@ -34,7 +34,9 @@ public class PreConsultationSummarizer {
     }
 
     public PreConsultationSummary summarize(Conversation conversation, List<Message> transcript, Instant now) {
+        // Requests for a clinical decision, and the boundary they got, are not what the patient reported.
         List<Turn> turns = transcript.stream()
+                .filter(message -> !isClinicalExchange(message))
                 .map(message -> new Turn(message.sender(), redactor.redact(message.content())))
                 .toList();
         Turn firstPatientTurn = turns.stream()
@@ -51,6 +53,12 @@ public class PreConsultationSummarizer {
         }
         return PreConsultationSummary.of(conversation, reason, safe(draft.evolutionTime()),
                 safe(draft.detailedSymptoms()), safe(draft.relevantHistory()), now);
+    }
+
+    private boolean isClinicalExchange(Message message) {
+        return message.sender() == Sender.PATIENT
+                ? safetyPolicy.asksForClinicalDecision(message.content())
+                : ClinicalSafetyPolicy.BOUNDARY_MESSAGE.equals(message.content());
     }
 
     private String safe(String field) {
