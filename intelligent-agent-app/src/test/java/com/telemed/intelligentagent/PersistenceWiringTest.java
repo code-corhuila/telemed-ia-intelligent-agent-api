@@ -67,7 +67,7 @@ class PersistenceWiringTest {
     @Test
     void refusesToStartUntilAppointmentsCanBeVerified() {
         // First the appointment, then the pre-consultation: without a way to verify it, nothing starts.
-        assertThatThrownBy(() -> start.start(PATIENT, UUID.randomUUID()))
+        assertThatThrownBy(() -> start.start(PATIENT, UUID.randomUUID(), "start-key-0001"))
                 .isInstanceOf(AppointmentVerificationUnavailableException.class);
         assertThat(mongo.getCollectionNames()).doesNotContain("conversations");
     }
