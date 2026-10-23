@@ -4,6 +4,7 @@ import com.telemed.intelligentagent.application.port.in.StartPreConsultationUseC
 import com.telemed.intelligentagent.application.port.out.AppointmentsPort;
 import com.telemed.intelligentagent.application.port.out.ConversationRepository;
 import com.telemed.intelligentagent.application.port.out.MessageRepository;
+import com.telemed.intelligentagent.application.port.out.UnitOfWork;
 import com.telemed.intelligentagent.domain.model.AgentDomainException;
 import com.telemed.intelligentagent.domain.model.Appointment;
 import com.telemed.intelligentagent.domain.model.Conversation;
@@ -28,14 +29,17 @@ public class StartPreConsultationService implements StartPreConsultationUseCase 
     private final AppointmentsPort appointments;
     private final ConversationRepository conversations;
     private final MessageRepository messages;
+    private final UnitOfWork unitOfWork;
     private final int questionLimit;
     private final Clock clock;
 
     public StartPreConsultationService(AppointmentsPort appointments, ConversationRepository conversations,
-                                       MessageRepository messages, int questionLimit, Clock clock) {
+                                       MessageRepository messages, UnitOfWork unitOfWork, int questionLimit,
+                                       Clock clock) {
         this.appointments = appointments;
         this.conversations = conversations;
         this.messages = messages;
+        this.unitOfWork = unitOfWork;
         this.questionLimit = questionLimit;
         this.clock = clock;
     }
@@ -61,9 +65,12 @@ public class StartPreConsultationService implements StartPreConsultationUseCase 
         }
 
         Conversation conversation = Conversation.start(patientId, appointmentId, questionLimit, now);
-        conversations.save(conversation);
-        messages.save(Message.of(conversation.id(), Sender.AGENT, "opening-" + conversation.id(), OPENING_MESSAGE,
-                now));
+        Message opening = Message.of(conversation.id(), Sender.AGENT, "opening-" + conversation.id(),
+                OPENING_MESSAGE, now);
+        unitOfWork.execute(() -> {
+            conversations.save(conversation);
+            messages.save(opening);
+        });
         return conversation;
     }
 }
