@@ -20,6 +20,9 @@ services:
       # agent-db as intelligent_agent_app; infra-mongo's mongo is reachable on the platform network.
       MONGODB_URI: ${MONGODB_URI:?Set MONGODB_URI}
 
+      # appointment-scheduling-api on the platform network; the patient's token is relayed.
+      APPOINTMENTS_BASE_URL: ${APPOINTMENTS_BASE_URL:-http://appointment-scheduling-api:8080}
+
       AGENT_QUESTION_LIMIT: ${AGENT_QUESTION_LIMIT:-8}
       # scripted (no key) or groq (needs GROQ_API_KEY from the gitignored .env).
       AGENT_MODEL_PROVIDER: ${AGENT_MODEL_PROVIDER:-scripted}
