@@ -53,7 +53,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 "The pre-consultation is not available right now. Try again in a moment.", List.of(), request);
     }
 
-    @ExceptionHandler(CurrentPatient.InvalidSubjectException.class)
+    @ExceptionHandler(TokenSubject.InvalidSubjectException.class)
     ResponseEntity<ApiErrorResponse> invalidSubject(HttpServletRequest request) {
         return error(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Missing or invalid credentials.", List.of(), request);
     }

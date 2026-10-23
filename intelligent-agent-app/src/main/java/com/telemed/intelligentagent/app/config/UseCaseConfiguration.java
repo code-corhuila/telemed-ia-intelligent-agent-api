@@ -2,6 +2,7 @@ package com.telemed.intelligentagent.app.config;
 
 import com.telemed.intelligentagent.application.port.in.FinishPreConsultationUseCase;
 import com.telemed.intelligentagent.application.port.in.GetPreConsultationUseCase;
+import com.telemed.intelligentagent.application.port.in.ReadSummaryForProfessionalUseCase;
 import com.telemed.intelligentagent.application.port.in.SendMessageUseCase;
 import com.telemed.intelligentagent.application.port.in.StartPreConsultationUseCase;
 import com.telemed.intelligentagent.application.port.out.AgentModelPort;
@@ -14,6 +15,7 @@ import com.telemed.intelligentagent.application.port.out.UnitOfWork;
 import com.telemed.intelligentagent.application.service.FinishPreConsultationService;
 import com.telemed.intelligentagent.application.service.GetPreConsultationService;
 import com.telemed.intelligentagent.application.service.PreConsultationSummarizer;
+import com.telemed.intelligentagent.application.service.ReadSummaryForProfessionalService;
 import com.telemed.intelligentagent.application.service.SendMessageService;
 import com.telemed.intelligentagent.application.service.StartPreConsultationService;
 import org.springframework.context.annotation.Bean;
@@ -55,6 +57,12 @@ public class UseCaseConfiguration {
                                                        PreConsultationSummarizer summarizer, UnitOfWork unitOfWork,
                                                        Clock clock) {
         return new FinishPreConsultationService(conversations, messages, summaries, summarizer, unitOfWork, clock);
+    }
+
+    @Bean
+    ReadSummaryForProfessionalUseCase readSummaryForProfessional(AppointmentsPort appointments,
+                                                                 SummaryRepository summaries) {
+        return new ReadSummaryForProfessionalService(appointments, summaries);
     }
 
     @Bean
