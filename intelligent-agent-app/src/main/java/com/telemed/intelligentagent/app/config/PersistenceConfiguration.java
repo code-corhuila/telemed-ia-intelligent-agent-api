@@ -1,0 +1,54 @@
+package com.telemed.intelligentagent.app.config;
+
+import com.telemed.intelligentagent.adapter.out.persistence.mongo.MongoConversationRepository;
+import com.telemed.intelligentagent.adapter.out.persistence.mongo.MongoMessageRepository;
+import com.telemed.intelligentagent.adapter.out.persistence.mongo.MongoSummaryRepository;
+import com.telemed.intelligentagent.application.port.out.ConversationRepository;
+import com.telemed.intelligentagent.application.port.out.MessageRepository;
+import com.telemed.intelligentagent.application.port.out.SummaryRepository;
+import com.telemed.intelligentagent.application.port.out.UnitOfWork;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.mongodb.MongoDatabaseFactory;
+import org.springframework.data.mongodb.MongoTransactionManager;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import java.time.Clock;
+import java.util.UUID;
+
+/** agent-db through MONGODB_URI (intelligent_agent_app user); a unit of work is a Mongo transaction. */
+@Configuration(proxyBeanMethods = false)
+public class PersistenceConfiguration {
+
+    @Bean
+    MongoTransactionManager transactionManager(MongoDatabaseFactory databaseFactory) {
+        return new MongoTransactionManager(databaseFactory);
+    }
+
+    @Bean
+    TransactionTemplate transactionTemplate(MongoTransactionManager transactionManager) {
+        return new TransactionTemplate(transactionManager);
+    }
+
+    @Bean
+    UnitOfWork unitOfWork(TransactionTemplate transaction) {
+        return work -> transaction.executeWithoutResult(status -> work.run());
+    }
+
+    @Bean
+    ConversationRepository conversationRepository(MongoTemplate mongo, Clock clock) {
+        return new MongoConversationRepository(mongo, clock);
+    }
+
+    @Bean
+    MessageRepository messageRepository(MongoTemplate mongo) {
+        return new MongoMessageRepository(mongo);
+    }
+
+    // Until the HTTP layer hands over the request's correlation id, each event gets its own.
+    @Bean
+    SummaryRepository summaryRepository(MongoTemplate mongo, TransactionTemplate transaction, Clock clock) {
+        return new MongoSummaryRepository(mongo, transaction, clock, UUID::randomUUID);
+    }
+}
