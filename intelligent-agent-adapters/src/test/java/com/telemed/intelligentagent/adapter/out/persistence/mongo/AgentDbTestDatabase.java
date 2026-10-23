@@ -43,6 +43,10 @@ final class AgentDbTestDatabase {
                   {"key":{"appointmentId":1},"name":"uq_summaries_appointment","unique":true,
                    "partialFilterExpression":{"appointmentId":{"$type":"string"}}}]}"""));
         template.getDb().runCommand(Document.parse("""
+                {"createIndexes":"idempotency_records","indexes":[
+                  {"key":{"principalId":1,"operation":1,"key":1},"name":"uq_idempotency_principal_operation_key",
+                   "unique":true}]}"""));
+        template.getDb().runCommand(Document.parse("""
                 {"createIndexes":"outbox_events","indexes":[
                   {"key":{"aggregateId":1,"eventType":1},"name":"uq_outbox_summary_event","unique":true}]}"""));
         return template;

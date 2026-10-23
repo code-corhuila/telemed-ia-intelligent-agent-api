@@ -1,9 +1,11 @@
 package com.telemed.intelligentagent.app.config;
 
 import com.telemed.intelligentagent.adapter.out.persistence.mongo.MongoConversationRepository;
+import com.telemed.intelligentagent.adapter.out.persistence.mongo.MongoIdempotencyRecords;
 import com.telemed.intelligentagent.adapter.out.persistence.mongo.MongoMessageRepository;
 import com.telemed.intelligentagent.adapter.out.persistence.mongo.MongoSummaryRepository;
 import com.telemed.intelligentagent.application.port.out.ConversationRepository;
+import com.telemed.intelligentagent.application.port.out.IdempotencyRecords;
 import com.telemed.intelligentagent.application.port.out.MessageRepository;
 import com.telemed.intelligentagent.application.port.out.SummaryRepository;
 import com.telemed.intelligentagent.application.port.out.UnitOfWork;
@@ -15,6 +17,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.util.UUID;
 
 /** agent-db through MONGODB_URI (intelligent_agent_app user); a unit of work is a Mongo transaction. */
@@ -39,6 +42,12 @@ public class PersistenceConfiguration {
     @Bean
     ConversationRepository conversationRepository(MongoTemplate mongo, Clock clock) {
         return new MongoConversationRepository(mongo, clock);
+    }
+
+    // Long enough for any client retry; agent-db's TTL index removes the record afterwards.
+    @Bean
+    IdempotencyRecords idempotencyRecords(MongoTemplate mongo) {
+        return new MongoIdempotencyRecords(mongo, Duration.ofHours(24));
     }
 
     @Bean

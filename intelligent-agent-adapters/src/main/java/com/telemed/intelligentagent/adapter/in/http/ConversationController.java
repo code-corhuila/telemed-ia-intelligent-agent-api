@@ -39,13 +39,13 @@ public class ConversationController {
     public record StartConversationRequest(@NotNull UUID appointmentId) {
     }
 
-    // The key is required by the contract now; replaying it from idempotency_records comes next.
+    // A retry with the same key gets the same conversation back (idempotency_records).
     @PostMapping
     public ResponseEntity<ConversationResponse> start(@AuthenticationPrincipal Jwt token,
                                                       @RequestHeader("Idempotency-Key") String idempotencyKey,
                                                       @Valid @RequestBody StartConversationRequest request) {
         UUID patient = CurrentPatient.of(token);
-        Conversation conversation = start.start(patient, request.appointmentId());
+        Conversation conversation = start.start(patient, request.appointmentId(), idempotencyKey);
         return ResponseEntity.created(URI.create(BASE + "/" + conversation.id()))
                 .body(ConversationResponse.of(get.get(patient, conversation.id())));
     }
