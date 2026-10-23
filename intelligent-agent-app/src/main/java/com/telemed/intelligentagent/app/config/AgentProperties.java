@@ -17,7 +17,7 @@ import java.time.Duration;
 @ConfigurationProperties(prefix = "agent")
 public record AgentProperties(
         @DefaultValue("8") @Min(1) @Max(20) int questionLimit,
-        @DefaultValue("3") @Min(0) @Max(20) int minimumQuestions,
+        @DefaultValue("4") @Min(0) @Max(20) int minimumQuestions,
         @DefaultValue @Valid @NotNull Model model,
         @DefaultValue @Valid @NotNull Appointments appointments
 ) {
