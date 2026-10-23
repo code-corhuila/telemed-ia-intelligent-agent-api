@@ -17,6 +17,12 @@ services:
       # Path inside the container: the agent only verifies tokens.
       JWT_PUBLIC_KEY_FILE: /run/secrets/jwt-public.pem
 
+      AGENT_QUESTION_LIMIT: ${AGENT_QUESTION_LIMIT:-8}
+      # scripted (no key) or groq (needs GROQ_API_KEY from the gitignored .env).
+      AGENT_MODEL_PROVIDER: ${AGENT_MODEL_PROVIDER:-scripted}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
+
     volumes:
       - ${JWT_PUBLIC_KEY_HOST_FILE:?Set JWT_PUBLIC_KEY_HOST_FILE}:/run/secrets/jwt-public.pem:ro
 
