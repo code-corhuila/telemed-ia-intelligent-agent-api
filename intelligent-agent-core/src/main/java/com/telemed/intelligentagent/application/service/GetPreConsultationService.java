@@ -3,7 +3,6 @@ package com.telemed.intelligentagent.application.service;
 import com.telemed.intelligentagent.application.port.in.GetPreConsultationUseCase;
 import com.telemed.intelligentagent.application.port.out.ConversationRepository;
 import com.telemed.intelligentagent.application.port.out.MessageRepository;
-import com.telemed.intelligentagent.application.port.out.SummaryRepository;
 import com.telemed.intelligentagent.domain.model.AgentDomainException;
 import com.telemed.intelligentagent.domain.model.Conversation;
 
@@ -17,13 +16,10 @@ public class GetPreConsultationService implements GetPreConsultationUseCase {
 
     private final ConversationRepository conversations;
     private final MessageRepository messages;
-    private final SummaryRepository summaries;
 
-    public GetPreConsultationService(ConversationRepository conversations, MessageRepository messages,
-                                     SummaryRepository summaries) {
+    public GetPreConsultationService(ConversationRepository conversations, MessageRepository messages) {
         this.conversations = conversations;
         this.messages = messages;
-        this.summaries = summaries;
     }
 
     @Override
@@ -40,7 +36,6 @@ public class GetPreConsultationService implements GetPreConsultationUseCase {
         Conversation conversation = found
                 .filter(candidate -> candidate.belongsTo(patientId))
                 .orElseThrow(() -> new AgentDomainException(CONVERSATION_NOT_FOUND, "The conversation was not found."));
-        return new PreConsultationView(conversation, messages.findByConversation(conversation.id()),
-                summaries.findByConversation(conversation.id()));
+        return new PreConsultationView(conversation, messages.findByConversation(conversation.id()));
     }
 }
