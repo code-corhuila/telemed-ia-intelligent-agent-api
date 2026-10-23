@@ -1,6 +1,5 @@
 package com.telemed.intelligentagent.app.config;
 
-import com.telemed.intelligentagent.adapter.out.appointments.UnverifiedAppointments;
 import com.telemed.intelligentagent.application.port.in.FinishPreConsultationUseCase;
 import com.telemed.intelligentagent.application.port.in.GetPreConsultationUseCase;
 import com.telemed.intelligentagent.application.port.in.SendMessageUseCase;
@@ -24,11 +23,6 @@ import java.time.Clock;
 /** The core's use cases, assembled from their ports; the core itself knows nothing of Spring. */
 @Configuration(proxyBeanMethods = false)
 public class UseCaseConfiguration {
-
-    @Bean
-    AppointmentsPort appointments() {
-        return new UnverifiedAppointments();
-    }
 
     @Bean
     PreConsultationSummarizer summarizer(AgentModelPort model) {
