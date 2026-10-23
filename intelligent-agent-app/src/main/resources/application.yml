@@ -5,6 +5,11 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: 20s
 
+  # agent-db as intelligent_agent_app (least privilege); required, never defaulted.
+  data:
+    mongodb:
+      uri: ${MONGODB_URI}
+
 server:
   port: ${PORT:8086}
   shutdown: graceful
