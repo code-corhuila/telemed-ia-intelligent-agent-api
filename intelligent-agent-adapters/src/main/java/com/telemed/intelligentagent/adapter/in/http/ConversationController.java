@@ -44,7 +44,7 @@ public class ConversationController {
     public ResponseEntity<ConversationResponse> start(@AuthenticationPrincipal Jwt token,
                                                       @RequestHeader("Idempotency-Key") String idempotencyKey,
                                                       @Valid @RequestBody StartConversationRequest request) {
-        UUID patient = CurrentPatient.of(token);
+        UUID patient = TokenSubject.of(token);
         Conversation conversation = start.start(patient, request.appointmentId(), idempotencyKey);
         return ResponseEntity.created(URI.create(BASE + "/" + conversation.id()))
                 .body(ConversationResponse.of(get.get(patient, conversation.id())));
@@ -52,12 +52,12 @@ public class ConversationController {
 
     @GetMapping("/{id}")
     public ConversationResponse get(@AuthenticationPrincipal Jwt token, @PathVariable UUID id) {
-        return ConversationResponse.of(get.get(CurrentPatient.of(token), id));
+        return ConversationResponse.of(get.get(TokenSubject.of(token), id));
     }
 
     @GetMapping(params = "appointmentId")
     public ConversationResponse getByAppointment(@AuthenticationPrincipal Jwt token,
                                                  @RequestParam UUID appointmentId) {
-        return ConversationResponse.of(get.getByAppointment(CurrentPatient.of(token), appointmentId));
+        return ConversationResponse.of(get.getByAppointment(TokenSubject.of(token), appointmentId));
     }
 }

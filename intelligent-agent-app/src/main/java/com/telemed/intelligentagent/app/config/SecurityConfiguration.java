@@ -47,6 +47,9 @@ public class SecurityConfiguration {
                         // Spring's own error dispatch, so an unknown path ends in 404, not 403.
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(EndpointRequest.to(HealthEndpoint.class, InfoEndpoint.class)).permitAll()
+                        // The summary is the professional's; everything else is the patient's own conversation.
+                        .requestMatchers("/api/v1/agent/preconsultations", "/api/v1/agent/preconsultations/**")
+                        .hasRole("PROFESSIONAL")
                         .requestMatchers("/api/v1/agent/**").hasRole("PATIENT")
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(resourceServer -> resourceServer

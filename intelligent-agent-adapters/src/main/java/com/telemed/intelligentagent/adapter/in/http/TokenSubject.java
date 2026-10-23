@@ -4,10 +4,10 @@ import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.util.UUID;
 
-/** identity-api's subject is the patient's UUID; anything else is not a usable credential. */
-final class CurrentPatient {
+/** identity-api's subject is the user's UUID (patient or professional); anything else is not a usable credential. */
+final class TokenSubject {
 
-    private CurrentPatient() {
+    private TokenSubject() {
     }
 
     static UUID of(Jwt token) {
