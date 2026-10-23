@@ -1,6 +1,7 @@
 package com.telemed.intelligentagent.app.config;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -16,9 +17,16 @@ import java.time.Duration;
 @ConfigurationProperties(prefix = "agent")
 public record AgentProperties(
         @DefaultValue("8") @Min(1) @Max(20) int questionLimit,
+        @DefaultValue("3") @Min(0) @Max(20) int minimumQuestions,
         @DefaultValue @Valid @NotNull Model model,
         @DefaultValue @Valid @NotNull Appointments appointments
 ) {
+
+    /** The agent may never be required to ask more than it is allowed to. */
+    @AssertTrue(message = "minimum-questions must not exceed question-limit")
+    public boolean isMinimumWithinLimit() {
+        return minimumQuestions <= questionLimit;
+    }
 
     /** appointment-scheduling-api; without a base URL the agent fails closed. */
     public record Appointments(

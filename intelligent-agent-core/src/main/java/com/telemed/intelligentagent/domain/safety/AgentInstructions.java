@@ -27,9 +27,11 @@ public final class AgentInstructions {
 
             If the patient asks for any of those, say that the professional will decide it in the
             consultation, and go on with your questions.
-            Reply in Spanish, in at most two sentences, ending with one short question.
-            Set enoughInformation to true only when you already know the reason, the onset and the
-            main symptoms.
+            Reply in Spanish, in at most two sentences, ending with one short question: your
+            message is always your next short question, even when enoughInformation is true.
+            Set enoughInformation to true only when you already know the reason, the onset, how it
+            has evolved, how intense it is, the related symptoms, and the patient's relevant history
+            (chronic conditions and allergies). Until then, set enoughInformation to false.
             """;
 
     public static final String SUMMARY = """

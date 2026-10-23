@@ -41,8 +41,10 @@ public class UseCaseConfiguration {
     @Bean
     SendMessageUseCase sendMessage(ConversationRepository conversations, MessageRepository messages,
                                    SummaryRepository summaries, PreConsultationSummarizer summarizer,
-                                   AgentModelPort model, UnitOfWork unitOfWork, Clock clock) {
-        return new SendMessageService(conversations, messages, summaries, summarizer, model, unitOfWork, clock);
+                                   AgentModelPort model, UnitOfWork unitOfWork, AgentProperties properties,
+                                   Clock clock) {
+        return new SendMessageService(conversations, messages, summaries, summarizer, model,
+                properties.minimumQuestions(), unitOfWork, clock);
     }
 
     @Bean
