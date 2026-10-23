@@ -37,6 +37,14 @@ final class AgentDbTestDatabase {
                   {"key":{"conversationId":1,"timestamp":1},"name":"idx_messages_conversation_timestamp"},
                   {"key":{"conversationId":1,"sender":1,"idempotencyKey":1},
                    "name":"uq_messages_conversation_sender_idempotency","unique":true}]}"""));
+        template.getDb().runCommand(Document.parse("""
+                {"createIndexes":"preconsultation_summaries","indexes":[
+                  {"key":{"conversationId":1},"name":"uq_summaries_conversation","unique":true},
+                  {"key":{"appointmentId":1},"name":"uq_summaries_appointment","unique":true,
+                   "partialFilterExpression":{"appointmentId":{"$type":"string"}}}]}"""));
+        template.getDb().runCommand(Document.parse("""
+                {"createIndexes":"outbox_events","indexes":[
+                  {"key":{"aggregateId":1,"eventType":1},"name":"uq_outbox_summary_event","unique":true}]}"""));
         return template;
     }
 }
