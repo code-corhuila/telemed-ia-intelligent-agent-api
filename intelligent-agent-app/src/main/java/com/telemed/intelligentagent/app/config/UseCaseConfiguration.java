@@ -7,6 +7,7 @@ import com.telemed.intelligentagent.application.port.in.StartPreConsultationUseC
 import com.telemed.intelligentagent.application.port.out.AgentModelPort;
 import com.telemed.intelligentagent.application.port.out.AppointmentsPort;
 import com.telemed.intelligentagent.application.port.out.ConversationRepository;
+import com.telemed.intelligentagent.application.port.out.IdempotencyRecords;
 import com.telemed.intelligentagent.application.port.out.MessageRepository;
 import com.telemed.intelligentagent.application.port.out.SummaryRepository;
 import com.telemed.intelligentagent.application.port.out.UnitOfWork;
@@ -32,9 +33,10 @@ public class UseCaseConfiguration {
     @Bean
     StartPreConsultationUseCase startPreConsultation(AppointmentsPort appointments,
                                                      ConversationRepository conversations,
-                                                     MessageRepository messages, UnitOfWork unitOfWork,
-                                                     AgentProperties properties, Clock clock) {
-        return new StartPreConsultationService(appointments, conversations, messages, unitOfWork,
+                                                     MessageRepository messages, IdempotencyRecords idempotency,
+                                                     UnitOfWork unitOfWork, AgentProperties properties,
+                                                     Clock clock) {
+        return new StartPreConsultationService(appointments, conversations, messages, idempotency, unitOfWork,
                 properties.questionLimit(), clock);
     }
 
