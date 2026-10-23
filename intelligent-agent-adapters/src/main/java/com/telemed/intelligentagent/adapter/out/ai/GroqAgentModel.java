@@ -30,8 +30,10 @@ import java.util.concurrent.ThreadLocalRandom;
 public class GroqAgentModel implements AgentModelPort {
 
     private static final Logger LOG = LoggerFactory.getLogger(GroqAgentModel.class);
-    // Groq's 400s for structured output the model produced badly; the request itself was fine.
-    private static final Set<String> UNPARSABLE_GENERATION = Set.of("output_parse_failed", "json_validate_failed");
+    // Groq's 400s for output the model produced badly (unparsable, or a tool call nobody offered it);
+    // the request itself was fine, so another try may pass.
+    private static final Set<String> UNPARSABLE_GENERATION =
+            Set.of("output_parse_failed", "json_validate_failed", "tool_use_failed");
     private static final int TURN_MAX_TOKENS = 300;
     private static final int SUMMARY_MAX_TOKENS = 450;
 
@@ -111,7 +113,7 @@ public class GroqAgentModel implements AgentModelPort {
 
     /**
      * Bounded retries with full-jitter backoff, only for network errors, 429,
-     * 5xx and output the model generated but Groq could not parse.
+     * 5xx and output the model generated badly (see UNPARSABLE_GENERATION).
      */
     private JsonNode send(ObjectNode body) {
         HttpRequest request = HttpRequest.newBuilder(endpoint)
