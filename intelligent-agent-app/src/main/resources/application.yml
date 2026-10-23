@@ -43,7 +43,7 @@ security:
 agent:
   question-limit: ${AGENT_QUESTION_LIMIT:8}
   # Questions the agent asks before the model may close, whatever it says.
-  minimum-questions: ${AGENT_MINIMUM_QUESTIONS:3}
+  minimum-questions: ${AGENT_MINIMUM_QUESTIONS:4}
   # Unset: no pre-consultation can start, as no appointment can be verified.
   appointments:
     base-url: ${APPOINTMENTS_BASE_URL:}
