@@ -17,8 +17,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.Instant;
 import java.util.List;
@@ -79,8 +82,19 @@ class PersistenceWiringTest {
         messages.save(Message.of(conversation.id(), Sender.AGENT, "opening-" + conversation.id(), "¿Qué te trae?",
                 Instant.now()));
 
-        List.of("Me duele la cabeza", "Desde hace dos días", "Un 6 de 10", "Tengo migraña", "Nada más")
-                .forEach(text -> send.send(PATIENT, conversation.id(), UUID.randomUUID().toString(), text));
+        // The closing turn arrives as a request carrying the gateway's correlation id.
+        UUID correlation = UUID.randomUUID();
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-Correlation-Id", correlation.toString());
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        try {
+            List.of("Me duele la cabeza", "Desde hace dos días", "Un 6 de 10", "Tengo migraña", "Nada más")
+                    .forEach(text -> send.send(PATIENT, conversation.id(), UUID.randomUUID().toString(), text));
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
+        assertThat(mongo.getCollection("outbox_events").find().first().getString("correlationId"))
+                .isEqualTo(correlation.toString());
 
         GetPreConsultationUseCase.PreConsultationView view = get.get(PATIENT, conversation.id());
         assertThat(view.conversation().status()).isEqualTo(ConversationStatus.FINISHED);
