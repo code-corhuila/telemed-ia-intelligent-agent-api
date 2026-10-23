@@ -38,7 +38,7 @@ class SendMessageServiceTest {
     private final InMemorySummaries summaries = new InMemorySummaries();
     private final TestUnitOfWork unitOfWork = new TestUnitOfWork();
     private final SendMessageService service = new SendMessageService(conversations, messages, summaries,
-            new PreConsultationSummarizer(model), model, unitOfWork, Clock.fixed(NOW, ZoneOffset.UTC));
+            new PreConsultationSummarizer(model), model, 0, unitOfWork, Clock.fixed(NOW, ZoneOffset.UTC));
 
     @Test
     void storesTheTurnAndTheSummaryInOneUnitOfWorkAfterTheModelAnswers() {
@@ -97,6 +97,32 @@ class SendMessageServiceTest {
         AgentTurn turn = service.send(PATIENT, conversation.id(), KEY, "Me duele la espalda");
 
         assertThat(turn.reply().content()).isEqualTo(ClinicalSafetyPolicy.BOUNDARY_MESSAGE);
+    }
+
+    @Test
+    void keepsAskingUntilItsMinimumOfQuestionsEvenIfTheModelSaysEnough() {
+        SendMessageService patient = new SendMessageService(conversations, messages, summaries,
+                new PreConsultationSummarizer(model), model, 2, unitOfWork, Clock.fixed(NOW, ZoneOffset.UTC));
+        Conversation conversation = started(8);
+        model.next = new AgentModelPort.AgentReply("¿Desde cuándo te duele?", true);
+
+        // The model's eagerness is not trusted: the core decides when enough was asked.
+        AgentTurn first = patient.send(PATIENT, conversation.id(), "turn-key-0001", "Me duele la cabeza");
+        assertThat(first.reply().content()).isEqualTo("¿Desde cuándo te duele?");
+        patient.send(PATIENT, conversation.id(), "turn-key-0002", "Desde ayer");
+        assertThat(conversation.questionsAsked()).isEqualTo(2);
+        assertThat(conversation.isActive()).isTrue();
+
+        AgentTurn third = patient.send(PATIENT, conversation.id(), "turn-key-0003", "Un 6 de 10");
+        assertThat(third.reply().content()).isEqualTo(SendMessageService.CLOSING_MESSAGE);
+        assertThat(third.conversation().finalizationReason()).isEqualTo(FinalizationReason.COMPLETED);
+    }
+
+    @Test
+    void neverAsksForMoreQuestionsThanItsLimitAllows() {
+        assertThatThrownBy(() -> new SendMessageService(conversations, messages, summaries,
+                new PreConsultationSummarizer(model), model, -1, unitOfWork, Clock.systemUTC()))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
