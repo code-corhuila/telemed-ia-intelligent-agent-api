@@ -157,7 +157,8 @@ class StartPreConsultationServiceTest {
     }
 
     private Appointment appointment(UUID patient, AppointmentStatus status) {
-        Appointment appointment = new Appointment(UUID.randomUUID(), patient, status, NOW.plusSeconds(86_400));
+        Appointment appointment = new Appointment(UUID.randomUUID(), patient, UUID.randomUUID(), status,
+                NOW.plusSeconds(86_400));
         appointments.put(appointment.id(), appointment);
         return appointment;
     }
