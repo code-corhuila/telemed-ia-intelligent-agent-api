@@ -16,8 +16,16 @@ import java.time.Duration;
 @ConfigurationProperties(prefix = "agent")
 public record AgentProperties(
         @DefaultValue("8") @Min(1) @Max(20) int questionLimit,
-        @DefaultValue @Valid @NotNull Model model
+        @DefaultValue @Valid @NotNull Model model,
+        @DefaultValue @Valid @NotNull Appointments appointments
 ) {
+
+    /** appointment-scheduling-api; without a base URL the agent fails closed. */
+    public record Appointments(
+            String baseUrl,
+            @DefaultValue("3s") @NotNull Duration timeout
+    ) {
+    }
 
     public enum Provider {
         SCRIPTED,
