@@ -31,6 +31,7 @@ class IntelligentAgentApplicationTest {
     @DynamicPropertySource
     static void identityPublicKey(DynamicPropertyRegistry registry) {
         TestIdentityKeys.register(registry);
+        TestMongo.register(registry);
     }
 
     @Test
