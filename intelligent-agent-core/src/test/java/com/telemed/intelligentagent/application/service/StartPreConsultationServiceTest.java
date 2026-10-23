@@ -33,9 +33,25 @@ class StartPreConsultationServiceTest {
     private final Map<UUID, Appointment> appointments = new HashMap<>();
     private final InMemoryConversations conversations = new InMemoryConversations();
     private final InMemoryMessages messages = new InMemoryMessages();
+    private final TestUnitOfWork unitOfWork = new TestUnitOfWork();
     private final StartPreConsultationService service = new StartPreConsultationService(
-            id -> Optional.ofNullable(appointments.get(id)), conversations, messages, 8,
+            id -> Optional.ofNullable(appointments.get(id)), conversations, messages, unitOfWork, 8,
             Clock.fixed(NOW, ZoneOffset.UTC));
+
+    @Test
+    void storesTheConversationAndItsOpeningInOneUnitOfWork() {
+        Appointment appointment = appointment(PATIENT, AppointmentStatus.CONFIRMED);
+        unitOfWork.defer();
+
+        service.start(PATIENT, appointment.id());
+        assertThat(conversations.stored).isEmpty();
+        assertThat(messages.stored).isEmpty();
+
+        unitOfWork.commit();
+        assertThat(unitOfWork.units).isEqualTo(1);
+        assertThat(conversations.stored).hasSize(1);
+        assertThat(messages.stored).hasSize(1);
+    }
 
     @Test
     void startsThePreConsultationOfTheirOwnUpcomingAppointment() {

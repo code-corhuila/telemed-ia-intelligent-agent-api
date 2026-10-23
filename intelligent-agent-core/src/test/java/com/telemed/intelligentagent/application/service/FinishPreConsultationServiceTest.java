@@ -29,8 +29,22 @@ class FinishPreConsultationServiceTest {
     private final InMemoryMessages messages = new InMemoryMessages();
     private final InMemorySummaries summaries = new InMemorySummaries();
     private final SummarizingModel model = new SummarizingModel();
+    private final TestUnitOfWork unitOfWork = new TestUnitOfWork();
     private final FinishPreConsultationService service = new FinishPreConsultationService(conversations, messages,
-            summaries, new PreConsultationSummarizer(model), Clock.fixed(NOW, ZoneOffset.UTC));
+            summaries, new PreConsultationSummarizer(model), unitOfWork, Clock.fixed(NOW, ZoneOffset.UTC));
+
+    @Test
+    void storesTheFinishAndTheSummaryInOneUnitOfWork() {
+        Conversation conversation = withPatientSaying("Me duele la cabeza");
+        unitOfWork.defer();
+
+        service.finish(PATIENT, conversation.id());
+        assertThat(summaries.stored).isEmpty();
+
+        unitOfWork.commit();
+        assertThat(unitOfWork.units).isEqualTo(1);
+        assertThat(summaries.stored).hasSize(1);
+    }
 
     @Test
     void finishesAndSummarisesFromARedactedTranscript() {
