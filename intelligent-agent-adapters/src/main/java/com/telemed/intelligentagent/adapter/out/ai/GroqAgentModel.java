@@ -34,8 +34,9 @@ public class GroqAgentModel implements AgentModelPort {
     // the request itself was fine, so another try may pass.
     private static final Set<String> UNPARSABLE_GENERATION =
             Set.of("output_parse_failed", "json_validate_failed", "tool_use_failed");
-    private static final int TURN_MAX_TOKENS = 300;
-    private static final int SUMMARY_MAX_TOKENS = 450;
+    // gpt-oss reasons first within the same budget (measured up to ~300 tokens on a turn).
+    private static final int TURN_MAX_TOKENS = 1024;
+    private static final int SUMMARY_MAX_TOKENS = 1536;
 
     private final ObjectMapper json = new ObjectMapper();
     private final HttpClient http;
