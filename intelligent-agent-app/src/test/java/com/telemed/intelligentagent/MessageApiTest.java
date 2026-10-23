@@ -27,7 +27,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import static com.telemed.intelligentagent.TestIdentityKeys.IDENTITY;
@@ -111,13 +110,13 @@ class MessageApiTest {
     }
 
     @Test
-    void finishesWithTheConversationAndItsSummary() {
+    void finishesWithoutHandingTheSummaryToThePatient() {
         conversation.finish(NOW.plusSeconds(60));
         PreConsultationSummary summary = PreConsultationSummary.of(conversation, "Dolor de cabeza", "Dos días",
                 null, null, NOW.plusSeconds(60));
         when(finish.finish(PATIENT, conversation.id())).thenReturn(summary);
         when(get.get(PATIENT, conversation.id()))
-                .thenReturn(new PreConsultationView(conversation, List.of(), Optional.of(summary)));
+                .thenReturn(new PreConsultationView(conversation, List.of()));
 
         ResponseEntity<String> response = post(finishPath(), null, null);
 
@@ -125,8 +124,8 @@ class MessageApiTest {
         assertThat(response.getBody())
                 .startsWith("{\"conversation\":{\"id\":\"" + conversation.id() + "\"")
                 .contains("\"status\":\"FINISHED\"")
-                .contains("\"preconsultationSummary\":{\"id\":\"" + summary.id() + "\"")
-                .contains("\"evolutionTime\":\"Dos días\"");
+                // The summary goes to the professional only.
+                .doesNotContain("preconsultationSummary", "Dolor de cabeza", "Dos días");
     }
 
     @Test

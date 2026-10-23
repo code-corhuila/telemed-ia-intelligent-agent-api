@@ -3,10 +3,10 @@ package com.telemed.intelligentagent.application.service;
 import com.telemed.intelligentagent.application.port.in.GetPreConsultationUseCase.PreConsultationView;
 import com.telemed.intelligentagent.domain.model.Conversation;
 import com.telemed.intelligentagent.domain.model.Message;
-import com.telemed.intelligentagent.domain.model.PreConsultationSummary;
 import com.telemed.intelligentagent.domain.model.Sender;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.RecordComponent;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -21,9 +21,8 @@ class GetPreConsultationServiceTest {
 
     private final InMemoryConversations conversations = new InMemoryConversations();
     private final InMemoryMessages messages = new InMemoryMessages();
-    private final InMemorySummaries summaries = new InMemorySummaries();
     private final GetPreConsultationService service =
-            new GetPreConsultationService(conversations, messages, summaries);
+            new GetPreConsultationService(conversations, messages);
 
     @Test
     void showsAnActiveConversationWithItsMessagesAndNoSummaryYet() {
@@ -33,17 +32,18 @@ class GetPreConsultationServiceTest {
 
         assertThat(view.conversation()).isEqualTo(conversation);
         assertThat(view.messages()).extracting(Message::content).containsExactly("¿Qué te trae?");
-        assertThat(view.summary()).isEmpty();
     }
 
     @Test
-    void showsTheSummaryOnceFinished() {
+    void neverHandsTheSummaryToThePatient() {
         Conversation conversation = conversationOf(PATIENT);
         conversation.finish(NOW);
-        PreConsultationSummary summary = PreConsultationSummary.of(conversation, "Tos", null, null, null, NOW);
-        summaries.save(summary);
 
-        assertThat(service.get(PATIENT, conversation.id()).summary()).contains(summary);
+        // The summary goes to the professional only: the patient's view has no place for it.
+        assertThat(service.get(PATIENT, conversation.id()).conversation().isActive()).isFalse();
+        assertThat(PreConsultationView.class.getRecordComponents())
+                .extracting(RecordComponent::getName)
+                .containsExactly("conversation", "messages");
     }
 
     @Test
