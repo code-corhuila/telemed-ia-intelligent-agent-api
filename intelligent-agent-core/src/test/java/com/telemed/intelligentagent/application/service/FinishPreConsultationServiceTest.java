@@ -118,19 +118,33 @@ class FinishPreConsultationServiceTest {
     }
 
     @Test
-    void leavesClinicalRequestsAndTheirBoundaryRepliesOutOfTheSummary() {
-        Conversation conversation = withPatientSaying("¿Qué medicamento puedo tomar?");
+    void keepsWhatThePatientReportedEvenAlongsideAClinicalRequest() {
+        Conversation conversation = withPatientSaying("Tengo dolor de garganta. ¿Debo tomar antibiótico?");
         messages.save(Message.of(conversation.id(), Sender.AGENT, "turn-key-0001",
                 ClinicalSafetyPolicy.BOUNDARY_MESSAGE, NOW));
-        messages.save(Message.of(conversation.id(), Sender.PATIENT, "turn-key-0002", "Me duele la cabeza", NOW));
-        model.draft = new AgentModelPort.SummaryDraft(null, null, null, null);
+        messages.save(Message.of(conversation.id(), Sender.PATIENT, "turn-key-0002", "Desde hace cuatro días", NOW));
+        model.draft = new AgentModelPort.SummaryDraft("Dolor de garganta", "Cuatro días", null, null);
+
+        PreConsultationSummary summary = service.finish(PATIENT, conversation.id());
+
+        // The patient's words all reach the model; only the agent's boundary replies are noise.
+        assertThat(model.lastTranscript).extracting(AgentModelPort.Turn::text).containsExactly("¿Qué te trae?",
+                "Tengo dolor de garganta. ¿Debo tomar antibiótico?", "Desde hace cuatro días");
+        assertThat(summary.consultationReason()).isEqualTo("Dolor de garganta");
+    }
+
+    @Test
+    void dropsSummaryFieldsThatAreRequestsForAClinicalDecision() {
+        Conversation conversation = withPatientSaying("Me duele la cabeza");
+        model.draft = new AgentModelPort.SummaryDraft("¿Qué medicamento puedo tomar?", "¿Debo tomar algo?",
+                "Dolor pulsátil", null);
 
         PreConsultationSummary summary = service.finish(PATIENT, conversation.id());
 
         // A request for a decision is not something the patient reported about their health.
-        assertThat(model.lastTranscript).extracting(AgentModelPort.Turn::text)
-                .containsExactly("¿Qué te trae?", "Me duele la cabeza");
         assertThat(summary.consultationReason()).isEqualTo("Me duele la cabeza");
+        assertThat(summary.evolutionTime()).isNull();
+        assertThat(summary.detailedSymptoms()).isEqualTo("Dolor pulsátil");
     }
 
     @Test
