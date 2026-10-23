@@ -6,6 +6,7 @@ import jakarta.servlet.DispatcherType;
 import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest;
 import org.springframework.boot.actuate.health.HealthEndpoint;
 import org.springframework.boot.actuate.info.InfoEndpoint;
+import org.springframework.boot.actuate.metrics.export.prometheus.PrometheusScrapeEndpoint;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -46,7 +47,9 @@ public class SecurityConfiguration {
                 .authorizeHttpRequests(requests -> requests
                         // Spring's own error dispatch, so an unknown path ends in 404, not 403.
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                        .requestMatchers(EndpointRequest.to(HealthEndpoint.class, InfoEndpoint.class)).permitAll()
+                        // The management port is published on 127.0.0.1 only: Prometheus scrapes it from the host.
+                        .requestMatchers(EndpointRequest.to(HealthEndpoint.class, InfoEndpoint.class,
+                                PrometheusScrapeEndpoint.class)).permitAll()
                         // The summary is the professional's; everything else is the patient's own conversation.
                         .requestMatchers("/api/v1/agent/preconsultations", "/api/v1/agent/preconsultations/**")
                         .hasRole("PROFESSIONAL")
