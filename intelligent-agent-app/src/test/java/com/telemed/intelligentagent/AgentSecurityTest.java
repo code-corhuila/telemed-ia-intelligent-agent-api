@@ -29,7 +29,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AgentSecurityTest {
 
     private static final KeyPair OTHER_KEYS = TestIdentityKeys.rsaKeyPair();
-    private static final String ANY_AGENT_PATH = "/api/v1/agent/conversations";
+    // Unmapped on purpose: these tests are about the door, not about any endpoint.
+    private static final String ANY_AGENT_PATH = "/api/v1/agent/unmapped";
     private static final String SUBJECT = UUID.randomUUID().toString();
 
     @Autowired
@@ -77,7 +78,7 @@ class AgentSecurityTest {
 
     @Test
     void letsPatientsThrough() {
-        // No endpoint is mapped yet: past security, the request simply finds nothing.
+        // Past security, the unmapped path simply finds nothing.
         assertThat(get(token(IDENTITY, ISSUER, SUBJECT, "PATIENT", inTenMinutes())).getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
     }
