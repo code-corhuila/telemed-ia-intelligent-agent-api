@@ -51,14 +51,14 @@ public class TurnController {
     public ReplyResponse send(@AuthenticationPrincipal Jwt token, @PathVariable UUID id,
                               @RequestHeader("Idempotency-Key") String idempotencyKey,
                               @Valid @RequestBody SendMessageRequest request) {
-        AgentTurn turn = send.send(CurrentPatient.of(token), id, idempotencyKey, request.content());
+        AgentTurn turn = send.send(TokenSubject.of(token), id, idempotencyKey, request.content());
         return new ReplyResponse(turn.reply().id(), turn.reply().sender().name(), turn.reply().content(),
                 turn.reply().sentAt(), turn.conversation().status().name());
     }
 
     @PostMapping("/finish")
     public FinishResponse finish(@AuthenticationPrincipal Jwt token, @PathVariable UUID id) {
-        UUID patient = CurrentPatient.of(token);
+        UUID patient = TokenSubject.of(token);
         finish.finish(patient, id);
         return new FinishResponse(ConversationResponse.of(get.get(patient, id)));
     }
