@@ -42,6 +42,7 @@ public class SendMessageService implements SendMessageUseCase {
     private final SummaryRepository summaries;
     private final PreConsultationSummarizer summarizer;
     private final AgentModelPort model;
+    private final int minimumQuestions;
     private final UnitOfWork unitOfWork;
     private final Clock clock;
     private final PatientMessagePolicy messagePolicy = new PatientMessagePolicy();
@@ -50,12 +51,16 @@ public class SendMessageService implements SendMessageUseCase {
 
     public SendMessageService(ConversationRepository conversations, MessageRepository messages,
                               SummaryRepository summaries, PreConsultationSummarizer summarizer,
-                              AgentModelPort model, UnitOfWork unitOfWork, Clock clock) {
+                              AgentModelPort model, int minimumQuestions, UnitOfWork unitOfWork, Clock clock) {
+        if (minimumQuestions < 0) {
+            throw new IllegalArgumentException("The minimum of questions cannot be negative.");
+        }
         this.conversations = conversations;
         this.messages = messages;
         this.summaries = summaries;
         this.summarizer = summarizer;
         this.model = model;
+        this.minimumQuestions = minimumQuestions;
         this.unitOfWork = unitOfWork;
         this.clock = clock;
     }
@@ -106,7 +111,8 @@ public class SendMessageService implements SendMessageUseCase {
         List<Turn> transcript = withTurn(history, patientMessage).stream().map(this::redacted).toList();
 
         AgentReply reply = model.nextTurn(transcript);
-        if (reply.enoughInformation()) {
+        // The model may only close once the core's minimum of questions was asked.
+        if (reply.enoughInformation() && conversation.questionsAsked() >= minimumQuestions) {
             conversation.finish(now);
             return CLOSING_MESSAGE;
         }
