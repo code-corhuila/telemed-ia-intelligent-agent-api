@@ -19,8 +19,13 @@ class InMemoryConversations implements ConversationRepository {
     }
 
     @Override
+    public Optional<Conversation> findByAppointment(UUID appointmentId) {
+        return stored.values().stream().filter(c -> c.appointmentId().equals(appointmentId)).findFirst();
+    }
+
+    @Override
     public boolean existsForAppointment(UUID appointmentId) {
-        return stored.values().stream().anyMatch(c -> c.appointmentId().equals(appointmentId));
+        return findByAppointment(appointmentId).isPresent();
     }
 
     @Override
