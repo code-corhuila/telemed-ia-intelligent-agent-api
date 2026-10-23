@@ -40,6 +40,21 @@ class ScriptedAgentModelTest {
     }
 
     @Test
+    void countsOnlyItsOwnQuestionsNotTheOpeningOrOtherAgentTurns() {
+        List<Turn> transcript = new ArrayList<>(List.of(
+                new Turn(Sender.AGENT, "¿Qué te trae?"),
+                new Turn(Sender.PATIENT, "Me duele la cabeza")));
+
+        assertThat(model.nextTurn(transcript).message()).isEqualTo(ScriptedAgentModel.QUESTIONS.get(0));
+
+        transcript.add(new Turn(Sender.AGENT, ScriptedAgentModel.QUESTIONS.get(0)));
+        transcript.add(new Turn(Sender.PATIENT, "¿Qué medicamento tomo?"));
+        transcript.add(new Turn(Sender.AGENT, ClinicalSafetyPolicy.BOUNDARY_MESSAGE));
+        transcript.add(new Turn(Sender.PATIENT, "Desde ayer"));
+        assertThat(model.nextTurn(transcript).message()).isEqualTo(ScriptedAgentModel.QUESTIONS.get(1));
+    }
+
+    @Test
     void summarisesOnlyWhatThePatientSaid() {
         List<Turn> transcript = List.of(
                 new Turn(Sender.PATIENT, "Me duele la cabeza"),
