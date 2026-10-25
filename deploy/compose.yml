@@ -1,0 +1,45 @@
+services:
+  intelligent-agent-api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+
+    # Only the gateway is published (Anexo G 5.6.1): patients reach the API through it.
+    expose:
+      - "8086"
+    ports:
+      # Health only from this machine.
+      - "127.0.0.1:${MANAGEMENT_PORT:-9086}:9086"
+
+    environment:
+      PORT: 8086
+      MANAGEMENT_PORT: 9086
+
+      JWT_ISSUER: ${JWT_ISSUER:-telemed-ia-identity-and-access}
+      # Path inside the container: the agent only verifies tokens.
+      JWT_PUBLIC_KEY_FILE: /run/secrets/jwt-public.pem
+
+      # agent-db as intelligent_agent_app; infra-mongo's mongo is reachable on the platform network.
+      MONGODB_URI: ${MONGODB_URI:?Set MONGODB_URI}
+
+      # appointment-scheduling-api on the platform network; the patient's token is relayed.
+      APPOINTMENTS_BASE_URL: ${APPOINTMENTS_BASE_URL:-http://appointment-scheduling-api:8080}
+
+      AGENT_QUESTION_LIMIT: ${AGENT_QUESTION_LIMIT:-8}
+      AGENT_MINIMUM_QUESTIONS: ${AGENT_MINIMUM_QUESTIONS:-4}
+      # scripted (no key) or groq (needs GROQ_API_KEY from the gitignored .env).
+      AGENT_MODEL_PROVIDER: ${AGENT_MODEL_PROVIDER:-scripted}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
+
+    volumes:
+      - ${JWT_PUBLIC_KEY_HOST_FILE:?Set JWT_PUBLIC_KEY_HOST_FILE}:/run/secrets/jwt-public.pem:ro
+
+    # Shared network: the API gateway reaches this service as intelligent-agent-api:8086.
+    networks:
+      - platform
+
+networks:
+  platform:
+    external: true
+    name: platform
