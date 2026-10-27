@@ -51,6 +51,16 @@ class MetricsEndpointTest {
                 .contains("agent_outbox_pending_events{event_type=\"PreConsultationSummaryGenerated\"}");
     }
 
+    @Test
+    void publishesTheBucketsTheSloRulesRead() throws InterruptedException {
+        http.getForEntity("http://localhost:" + port + "/api/v1/agent/conversations/x", String.class);
+
+        // deploy/prometheus/agent-slo-rules.yml reads these exact le values (1 s for finish, 4 s for a turn).
+        assertThat(scrapeOnceRecorded("agent_request_duration_seconds_bucket{").getBody())
+                .containsPattern("agent_request_duration_seconds_bucket\\{[^}]*le=\"1.0\"")
+                .containsPattern("agent_request_duration_seconds_bucket\\{[^}]*le=\"4.0\"");
+    }
+
     /**
      * The filter records a request after its response is sent, so a fast scrape can arrive
      * first; Prometheus scrapes every few seconds and never notices, a test can.
