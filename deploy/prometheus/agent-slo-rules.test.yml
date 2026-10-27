@@ -79,16 +79,20 @@ tests:
               description: "POST /api/v1/agent/conversations/{id}/finish is burning its latency budget (99 % within 1 s) 14.4x too fast; a slow MongoDB intelligent_agent or AI provider is the usual cause."
               runbook_url: "https://github.com/code-corhuila/telemed-ia-intelligent-agent-api/blob/develop/docs/observability/runbook.md#agentfinishlatencyfastburn"
 
-  # Low traffic: one slow finish out of three in 10 minutes is 33 %, but too few requests to page.
-  - name: one slow finish at night does not page
+  # Low traffic: four slow finishes in a row at night are 100 % slow for over 2 minutes,
+  # but fewer than 5 finishes in 10 minutes is too little traffic to page anyone.
+  - name: a few slow finishes at night do not page
     interval: 1m
     input_series:
       - series: 'agent_request_duration_seconds_count{route="/api/v1/agent/conversations/{id}/finish",method="POST"}'
-        values: '0x29 1 1 1 1 2 2 2 2 3x22'
+        values: '0x30 1 2 3 4x16'
       - series: 'agent_request_duration_seconds_bucket{route="/api/v1/agent/conversations/{id}/finish",method="POST",le="1.0"}'
-        values: '0x29 1 1 1 1 1 1 1 1 2x22'
+        values: '0x50'
     alert_rule_test:
-      - eval_time: 40m
+      - eval_time: 34m
+        alertname: AgentFinishLatencyFastBurn
+        exp_alerts: []
+      - eval_time: 35m
         alertname: AgentFinishLatencyFastBurn
         exp_alerts: []
 
