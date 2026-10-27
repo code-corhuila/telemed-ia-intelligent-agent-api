@@ -16,6 +16,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Set;
@@ -125,18 +126,42 @@ public class GroqAgentModel implements AgentModelPort {
                 .build();
         for (int attempt = 1; ; attempt++) {
             boolean retryable;
+            long started = System.nanoTime();
             try {
                 HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
                 if (response.statusCode() == 200) {
+                    LOG.atInfo()
+                            .addKeyValue("event", "agent.model.responded")
+                            .addKeyValue("attempt", attempt)
+                            .addKeyValue("duration_ms", millisSince(started))
+                            .log("AI provider answered");
                     return json.readTree(response.body());
                 }
                 String errorCode = errorCode(response.body());
                 // Status and Groq's error code only: the body may echo the patient's words.
-                LOG.warn("AI provider answered {} ({}) on attempt {}", response.statusCode(), errorCode, attempt);
+                LOG.atWarn()
+                        .addKeyValue("event", "agent.model.failed")
+                        .addKeyValue("status", response.statusCode())
+                        .addKeyValue("provider_error_code", errorCode)
+                        .addKeyValue("attempt", attempt)
+                        .addKeyValue("duration_ms", millisSince(started))
+                        .log("AI provider answered with an error");
                 retryable = response.statusCode() == 429 || response.statusCode() >= 500
                         || UNPARSABLE_GENERATION.contains(errorCode);
+            } catch (HttpTimeoutException e) {
+                LOG.atWarn()
+                        .addKeyValue("event", "agent.model.timeout")
+                        .addKeyValue("attempt", attempt)
+                        .addKeyValue("duration_ms", millisSince(started))
+                        .log("AI provider did not answer in time");
+                retryable = true;
             } catch (IOException e) {
-                LOG.warn("AI provider unreachable on attempt {}: {}", attempt, e.getClass().getSimpleName());
+                LOG.atWarn()
+                        .addKeyValue("event", "agent.model.unreachable")
+                        .addKeyValue("error_type", e.getClass().getSimpleName())
+                        .addKeyValue("attempt", attempt)
+                        .addKeyValue("duration_ms", millisSince(started))
+                        .log("AI provider unreachable");
                 retryable = true;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -147,6 +172,10 @@ public class GroqAgentModel implements AgentModelPort {
             }
             pause(attempt);
         }
+    }
+
+    private static long millisSince(long startedNanos) {
+        return (System.nanoTime() - startedNanos) / 1_000_000;
     }
 
     private String errorCode(String body) {
