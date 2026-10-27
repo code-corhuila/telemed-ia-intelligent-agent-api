@@ -39,17 +39,32 @@ class MetricsEndpointTest {
     }
 
     @Test
-    void exposesTheWeek11MetricsOnTheManagementPort() {
+    void exposesTheWeek11MetricsOnTheManagementPort() throws InterruptedException {
         http.getForEntity("http://localhost:" + port + "/api/v1/agent/conversations/x", String.class);
 
-        ResponseEntity<String> scrape = http.getForEntity(
-                "http://localhost:" + managementPort + "/actuator/prometheus", String.class);
+        ResponseEntity<String> scrape = scrapeOnceRecorded("agent_request_duration_seconds_bucket{");
 
         assertThat(scrape.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(scrape.getBody())
                 .contains("agent_requests_total{")
                 .contains("agent_request_duration_seconds_bucket{")
                 .contains("agent_outbox_pending_events{event_type=\"PreConsultationSummaryGenerated\"}");
+    }
+
+    /**
+     * The filter records a request after its response is sent, so a fast scrape can arrive
+     * first; Prometheus scrapes every few seconds and never notices, a test can.
+     */
+    private ResponseEntity<String> scrapeOnceRecorded(String series) throws InterruptedException {
+        ResponseEntity<String> scrape = null;
+        for (int attempt = 0; attempt < 20; attempt++) {
+            scrape = http.getForEntity("http://localhost:" + managementPort + "/actuator/prometheus", String.class);
+            if (scrape.getBody() != null && scrape.getBody().contains(series)) {
+                return scrape;
+            }
+            Thread.sleep(100);
+        }
+        return scrape;
     }
 
     @Test
