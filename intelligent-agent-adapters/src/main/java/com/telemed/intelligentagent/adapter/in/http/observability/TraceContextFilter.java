@@ -42,7 +42,8 @@ public class TraceContextFilter extends OncePerRequestFilter {
             chain.doFilter(request, response);
         } finally {
             Object route = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
-            LOG.atInfo()
+            // A 5xx failed the patient and needs attention; a 4xx was the caller's and was answered.
+            (response.getStatus() >= 500 ? LOG.atError() : LOG.atInfo())
                     .addKeyValue("event", "http.request.completed")
                     .addKeyValue("route", route == null ? "unmatched" : route.toString())
                     .addKeyValue("method", request.getMethod())

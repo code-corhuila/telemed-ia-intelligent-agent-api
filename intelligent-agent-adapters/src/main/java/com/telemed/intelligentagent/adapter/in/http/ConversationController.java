@@ -6,6 +6,8 @@ import com.telemed.intelligentagent.application.port.in.StartPreConsultationUseC
 import com.telemed.intelligentagent.domain.model.Conversation;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -28,6 +30,8 @@ public class ConversationController {
 
     static final String BASE = "/api/v1/agent/conversations";
 
+    private static final Logger LOG = LoggerFactory.getLogger(ConversationController.class);
+
     private final StartPreConsultationUseCase start;
     private final GetPreConsultationUseCase get;
 
@@ -46,6 +50,11 @@ public class ConversationController {
                                                       @Valid @RequestBody StartConversationRequest request) {
         UUID patient = TokenSubject.of(token);
         Conversation conversation = start.start(patient, request.appointmentId(), idempotencyKey);
+        LOG.atInfo()
+                .addKeyValue("event", "conversation.started")
+                .addKeyValue("conversation_id", conversation.id().toString())
+                .addKeyValue("conversation_status", conversation.status().name())
+                .log("pre-consultation started");
         return ResponseEntity.created(URI.create(BASE + "/" + conversation.id()))
                 .body(ConversationResponse.of(get.get(patient, conversation.id())));
     }
