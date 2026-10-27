@@ -1,0 +1,118 @@
+# promtool test rules deploy/prometheus/agent-slo-rules.test.yml
+# Scenarios from the week 11 incident drill (CP9) and the alert policy (CP7). One sample per minute.
+rule_files:
+  - agent-slo-rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  # CP9 drill: 25 % of requests fail from minute 60 after an hour of clean traffic (4 requests a minute).
+  # The 1 h ratio crosses 14.4 % after about 35 minutes; with "for: 5m" the page comes at about minute 40.
+  - name: availability fast burn pages during a sustained 25 % failure and stops after recovery
+    interval: 1m
+    input_series:
+      - series: 'agent_requests_total{route="/api/v1/agent/conversations/{id}/finish",method="POST",outcome="success"}'
+        values: '0+4x60 243+3x49 393+4x30'
+      - series: 'agent_requests_total{route="/api/v1/agent/conversations/{id}/finish",method="POST",outcome="error"}'
+        values: '0x60 1+1x49 50x30'
+    alert_rule_test:
+      - eval_time: 85m
+        alertname: AgentAvailabilityFastBurn
+        exp_alerts: []
+      - eval_time: 108m
+        alertname: AgentAvailabilityFastBurn
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              team: telemed-ia-group-2
+              service: intelligent-agent-api
+              slo: availability
+            exp_annotations:
+              summary: "intelligent-agent-api is burning the availability error budget 14.4x too fast (2 % of the 30-day budget in 1 hour)"
+              description: "More than 14.4 % of /api/v1/agent requests failed with 5xx in the last hour and in the last 5 minutes."
+              runbook_url: "https://github.com/code-corhuila/telemed-ia-intelligent-agent-api/blob/develop/docs/observability/runbook.md#agentavailabilityfastburn"
+      - eval_time: 125m
+        alertname: AgentAvailabilityFastBurn
+        exp_alerts: []
+
+  # Alert policy: an isolated 500 never pages.
+  - name: an isolated 500 does not page
+    interval: 1m
+    input_series:
+      - series: 'agent_requests_total{route="/api/v1/agent/conversations/{id}/messages",method="POST",outcome="success"}'
+        values: '0+4x120'
+      - series: 'agent_requests_total{route="/api/v1/agent/conversations/{id}/messages",method="POST",outcome="error"}'
+        values: '0x60 1x60'
+    alert_rule_test:
+      - eval_time: 63m
+        alertname: AgentAvailabilityFastBurn
+        exp_alerts: []
+      - eval_time: 75m
+        alertname: AgentAvailabilityFastBurn
+        exp_alerts: []
+      - eval_time: 75m
+        alertname: AgentAvailabilitySlowBurn
+        exp_alerts: []
+
+  # CP9 action item 1: a slow MongoDB (25 % of finishes above 1 s) must page in less than 10 minutes.
+  - name: finish latency fast burn pages within 10 minutes of a slow dependency
+    interval: 1m
+    input_series:
+      - series: 'agent_request_duration_seconds_count{route="/api/v1/agent/conversations/{id}/finish",method="POST"}'
+        values: '0+4x60'
+      - series: 'agent_request_duration_seconds_bucket{route="/api/v1/agent/conversations/{id}/finish",method="POST",le="1.0"}'
+        values: '0+4x30 123+3x30'
+    alert_rule_test:
+      - eval_time: 34m
+        alertname: AgentFinishLatencyFastBurn
+        exp_alerts: []
+      - eval_time: 40m
+        alertname: AgentFinishLatencyFastBurn
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              team: telemed-ia-group-2
+              service: intelligent-agent-api
+              slo: finish-latency
+            exp_annotations:
+              summary: "Pre-consultation finishes are slow: more than 14.4 % above 1 s in the last 10 minutes"
+              description: "POST /api/v1/agent/conversations/{id}/finish is burning its latency budget (99 % within 1 s) 14.4x too fast; a slow MongoDB intelligent_agent or AI provider is the usual cause."
+              runbook_url: "https://github.com/code-corhuila/telemed-ia-intelligent-agent-api/blob/develop/docs/observability/runbook.md#agentfinishlatencyfastburn"
+
+  # Low traffic: one slow finish out of three in 10 minutes is 33 %, but too few requests to page.
+  - name: one slow finish at night does not page
+    interval: 1m
+    input_series:
+      - series: 'agent_request_duration_seconds_count{route="/api/v1/agent/conversations/{id}/finish",method="POST"}'
+        values: '0x29 1 1 1 1 2 2 2 2 3x22'
+      - series: 'agent_request_duration_seconds_bucket{route="/api/v1/agent/conversations/{id}/finish",method="POST",le="1.0"}'
+        values: '0x29 1 1 1 1 1 1 1 1 2x22'
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: AgentFinishLatencyFastBurn
+        exp_alerts: []
+
+  # SLO 2: every message turn above 4 s from minute 60 (the AI provider hangs).
+  - name: message latency fast burn pages when turns stop answering in 4 s
+    interval: 1m
+    input_series:
+      - series: 'agent_request_duration_seconds_count{route="/api/v1/agent/conversations/{id}/messages",method="POST"}'
+        values: '0+10x120'
+      - series: 'agent_request_duration_seconds_bucket{route="/api/v1/agent/conversations/{id}/messages",method="POST",le="4.0"}'
+        values: '0+10x60 600x60'
+    alert_rule_test:
+      - eval_time: 100m
+        alertname: AgentMessageLatencyFastBurn
+        exp_alerts: []
+      - eval_time: 115m
+        alertname: AgentMessageLatencyFastBurn
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              team: telemed-ia-group-2
+              service: intelligent-agent-api
+              slo: message-latency
+            exp_annotations:
+              summary: "Message turns are slow: burning the latency error budget 14.4x too fast"
+              description: "More than 72 % of POST /api/v1/agent/conversations/{id}/messages took longer than 4 s in the last hour and in the last 5 minutes."
+              runbook_url: "https://github.com/code-corhuila/telemed-ia-intelligent-agent-api/blob/develop/docs/observability/runbook.md#agentmessagelatencyfastburn"
