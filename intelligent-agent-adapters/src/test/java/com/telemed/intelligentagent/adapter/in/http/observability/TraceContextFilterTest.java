@@ -1,5 +1,6 @@
 package com.telemed.intelligentagent.adapter.in.http.observability;
 
+import com.telemed.intelligentagent.adapter.CapturedLogs;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
@@ -10,6 +11,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 /** Week 11 log contract (CP2): every line of a request carries its trace_id, span_id and correlation_id. */
 class TraceContextFilterTest {
@@ -46,6 +48,20 @@ class TraceContextFilterTest {
 
         assertThat(seenByTheRequest.get("trace_id")).matches("[0-9a-f]{32}").isNotEqualTo("0".repeat(32));
         assertThat(seenByTheRequest.get("correlation_id")).isNotBlank();
+    }
+
+    @Test
+    void logsAServerErrorAsAnErrorAndAClientErrorAsInfo() throws Exception {
+        try (CapturedLogs logs = CapturedLogs.of(TraceContextFilter.class)) {
+            filter.doFilter(new MockHttpServletRequest(), new MockHttpServletResponse(),
+                    (request, response) -> ((MockHttpServletResponse) response).setStatus(503));
+            filter.doFilter(new MockHttpServletRequest(), new MockHttpServletResponse(),
+                    (request, response) -> ((MockHttpServletResponse) response).setStatus(404));
+
+            assertThat(logs.events("http.request.completed"))
+                    .extracting(event -> event.get("level"), event -> event.get("status"))
+                    .containsExactly(tuple("ERROR", 503), tuple("INFO", 404));
+        }
     }
 
     @Test

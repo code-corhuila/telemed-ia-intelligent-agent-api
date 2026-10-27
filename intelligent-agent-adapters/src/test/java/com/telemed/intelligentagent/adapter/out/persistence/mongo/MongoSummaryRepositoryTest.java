@@ -1,5 +1,6 @@
 package com.telemed.intelligentagent.adapter.out.persistence.mongo;
 
+import com.telemed.intelligentagent.adapter.CapturedLogs;
 import com.telemed.intelligentagent.domain.model.AgentDomainException;
 import com.telemed.intelligentagent.domain.model.Conversation;
 import com.telemed.intelligentagent.domain.model.PreConsultationSummary;
@@ -83,6 +84,23 @@ class MongoSummaryRepositoryTest {
                 .append("patientId", conversation.patientId().toString())
                 .append("conversationId", conversation.id().toString())
                 .append("generatedAt", Date.from(NOW)));
+    }
+
+    @Test
+    void logsTheGeneratedSummaryWithItsOutboxEvent() {
+        PreConsultationSummary summary = summary("Dolor de cabeza", null);
+
+        try (CapturedLogs logs = CapturedLogs.of(MongoSummaryRepository.class)) {
+            repository.save(summary);
+
+            Document event = mongo.getCollection("outbox_events").find().first();
+            assertThat(logs.events("preconsultation.summary.generated")).singleElement().satisfies(line -> assertThat(line)
+                    .containsEntry("level", "INFO")
+                    .containsEntry("summary_id", summary.id().toString())
+                    .containsEntry("conversation_id", conversation.id().toString())
+                    .containsEntry("outbox_event_id", event.getString("_id")));
+            assertThat(logs.everything()).doesNotContain("Dolor de cabeza");
+        }
     }
 
     @Test
