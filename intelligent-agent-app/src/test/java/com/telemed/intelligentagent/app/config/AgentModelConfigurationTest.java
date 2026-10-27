@@ -1,6 +1,6 @@
 package com.telemed.intelligentagent.app.config;
 
-import com.telemed.intelligentagent.adapter.out.ai.GroqAgentModel;
+import com.telemed.intelligentagent.adapter.out.ai.CircuitBreakingAgentModel;
 import com.telemed.intelligentagent.adapter.out.ai.ScriptedAgentModel;
 import com.telemed.intelligentagent.application.port.out.AgentModelPort;
 import org.junit.jupiter.api.Test;
@@ -9,6 +9,7 @@ import org.springframework.boot.autoconfigure.validation.ValidationAutoConfigura
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,9 +35,20 @@ class AgentModelConfigurationTest {
     }
 
     @Test
-    void usesGroqWhenSelectedWithAKey() {
+    void usesGroqBehindACircuitBreakerWhenSelectedWithAKey() {
         context.withPropertyValues("agent.model.provider=groq", "agent.model.groq.api-key=" + FAKE_KEY)
-                .run(app -> assertThat(app.getBean(AgentModelPort.class)).isInstanceOf(GroqAgentModel.class));
+                .run(app -> {
+                    assertThat(app.getBean(AgentModelPort.class)).isInstanceOf(CircuitBreakingAgentModel.class);
+                    assertThat(app.getBean(AgentProperties.class).model().circuit().failureThreshold()).isEqualTo(5);
+                    assertThat(app.getBean(AgentProperties.class).model().circuit().openFor())
+                            .isEqualTo(Duration.ofSeconds(30));
+                });
+    }
+
+    @Test
+    void refusesACircuitThatNeverOpensOrNeverWaits() {
+        context.withPropertyValues("agent.model.circuit.failure-threshold=0").run(app -> assertThat(app).hasFailed());
+        context.withPropertyValues("agent.model.circuit.open-for=0s").run(app -> assertThat(app).hasFailed());
     }
 
     @Test
