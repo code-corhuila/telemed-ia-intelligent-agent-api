@@ -17,6 +17,7 @@ import com.telemed.intelligentagent.application.service.GetPreConsultationServic
 import com.telemed.intelligentagent.application.service.PreConsultationSummarizer;
 import com.telemed.intelligentagent.application.service.ReadSummaryForProfessionalService;
 import com.telemed.intelligentagent.application.service.SendMessageService;
+import com.telemed.intelligentagent.application.service.PausableStartPreConsultation;
 import com.telemed.intelligentagent.application.service.StartPreConsultationService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -38,8 +39,10 @@ public class UseCaseConfiguration {
                                                      MessageRepository messages, IdempotencyRecords idempotency,
                                                      UnitOfWork unitOfWork, AgentProperties properties,
                                                      Clock clock) {
-        return new StartPreConsultationService(appointments, conversations, messages, idempotency, unitOfWork,
-                properties.questionLimit(), clock);
+        return new PausableStartPreConsultation(
+                new StartPreConsultationService(appointments, conversations, messages, idempotency, unitOfWork,
+                        properties.questionLimit(), clock),
+                properties::preconsultationsPaused);
     }
 
     @Bean

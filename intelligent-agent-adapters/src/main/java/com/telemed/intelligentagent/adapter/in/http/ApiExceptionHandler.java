@@ -1,6 +1,7 @@
 package com.telemed.intelligentagent.adapter.in.http;
 
 import com.telemed.intelligentagent.adapter.in.http.ApiErrorResponse.FieldError;
+import com.telemed.intelligentagent.application.port.in.PreConsultationsPausedException;
 import com.telemed.intelligentagent.application.port.out.AgentModelUnavailableException;
 import com.telemed.intelligentagent.application.port.out.AppointmentVerificationUnavailableException;
 import com.telemed.intelligentagent.domain.model.AgentDomainException;
@@ -61,6 +62,18 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 .log("dependency unavailable: {}", exception.getMessage());
         return error(HttpStatus.SERVICE_UNAVAILABLE, "SERVICE_UNAVAILABLE",
                 "The pre-consultation is not available right now. Try again in a moment.", List.of(), request);
+    }
+
+    /** Its own code, so the portal tells the patient the appointment goes on without a pre-consultation. */
+    @ExceptionHandler(PreConsultationsPausedException.class)
+    ResponseEntity<ApiErrorResponse> paused(PreConsultationsPausedException exception, HttpServletRequest request) {
+        LOG.atWarn()
+                .addKeyValue("event", "preconsultation.paused")
+                .addKeyValue("error_code", "PRECONSULTATION_PAUSED")
+                .log("new pre-consultation refused while paused");
+        return error(HttpStatus.SERVICE_UNAVAILABLE, "PRECONSULTATION_PAUSED",
+                "Pre-consultations are paused right now. Your appointment can continue without the pre-consultation.",
+                List.of(), request);
     }
 
     /** agent-db did not answer in time (or at all): the same 503 as any other dependency, never a 500. */

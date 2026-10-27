@@ -20,7 +20,9 @@ public record AgentProperties(
         @DefaultValue("4") @Min(0) @Max(20) int minimumQuestions,
         @DefaultValue @Valid @NotNull Model model,
         @DefaultValue @Valid @NotNull Appointments appointments,
-        @DefaultValue @Valid @NotNull Mongo mongo
+        @DefaultValue @Valid @NotNull Mongo mongo,
+        // Runbook mitigation 1: refuse new pre-consultations while the agent is degraded.
+        @DefaultValue("false") boolean preconsultationsPaused
 ) {
 
     /** The agent may never be required to ask more than it is allowed to. */
@@ -58,8 +60,21 @@ public record AgentProperties(
 
     public record Model(
             @DefaultValue("scripted") @NotNull Provider provider,
-            @DefaultValue @Valid @NotNull Groq groq
+            @DefaultValue @Valid @NotNull Groq groq,
+            @DefaultValue @Valid @NotNull Circuit circuit
     ) {
+    }
+
+    /** Runbook mitigation 3: how many provider failures in a row open the circuit, and for how long. */
+    public record Circuit(
+            @DefaultValue("5") @Min(1) @Max(50) int failureThreshold,
+            @DefaultValue("30s") @NotNull Duration openFor
+    ) {
+
+        @AssertTrue(message = "open-for must be positive")
+        public boolean isOpenForPositive() {
+            return openFor == null || openFor.isPositive();
+        }
     }
 
     public record Groq(

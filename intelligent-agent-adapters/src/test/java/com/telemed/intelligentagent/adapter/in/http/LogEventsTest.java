@@ -4,6 +4,7 @@ import com.telemed.intelligentagent.adapter.CapturedLogs;
 import com.telemed.intelligentagent.application.port.in.FinishPreConsultationUseCase;
 import com.telemed.intelligentagent.application.port.in.GetPreConsultationUseCase;
 import com.telemed.intelligentagent.application.port.in.GetPreConsultationUseCase.PreConsultationView;
+import com.telemed.intelligentagent.application.port.in.PreConsultationsPausedException;
 import com.telemed.intelligentagent.application.port.in.SendMessageUseCase;
 import com.telemed.intelligentagent.application.port.in.SendMessageUseCase.AgentTurn;
 import com.telemed.intelligentagent.application.port.in.StartPreConsultationUseCase;
@@ -117,6 +118,18 @@ class LogEventsTest {
                 .containsEntry("level", "WARN").containsEntry("error_code", "SERVICE_UNAVAILABLE"));
         assertThat(errorLogs.events("request.failed")).singleElement().satisfies(event -> assertThat(event)
                 .containsEntry("level", "ERROR").containsEntry("error_code", "INTERNAL_ERROR"));
+    }
+
+    @Test
+    void answersAPausedStartWithItsOwnCodeSoThePortalCanSkipThePreConsultation() {
+        var response = new ApiExceptionHandler().paused(new PreConsultationsPausedException(),
+                new MockHttpServletRequest());
+
+        assertThat(response.getStatusCode().value()).isEqualTo(503);
+        assertThat(response.getBody().error()).isEqualTo("PRECONSULTATION_PAUSED");
+        assertThat(response.getBody().message()).contains("without the pre-consultation");
+        assertThat(errorLogs.events("preconsultation.paused")).singleElement().satisfies(event -> assertThat(event)
+                .containsEntry("level", "WARN").containsEntry("error_code", "PRECONSULTATION_PAUSED"));
     }
 
     @Test

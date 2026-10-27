@@ -1,6 +1,7 @@
 package com.telemed.intelligentagent.app.config;
 
 import com.telemed.intelligentagent.adapter.in.http.TraceIds;
+import com.telemed.intelligentagent.adapter.observability.CurrentTrace;
 import com.telemed.intelligentagent.adapter.out.persistence.mongo.MongoConversationRepository;
 import com.telemed.intelligentagent.adapter.out.persistence.mongo.MongoIdempotencyRecords;
 import com.telemed.intelligentagent.adapter.out.persistence.mongo.MongoMessageRepository;
@@ -55,9 +56,10 @@ public class PersistenceConfiguration {
         return new MongoMessageRepository(mongo);
     }
 
-    // Each outbox event carries the X-Correlation-Id of the request that produced it.
+    // Each outbox event carries the X-Correlation-Id and the W3C trace context of the request that produced it.
     @Bean
     SummaryRepository summaryRepository(MongoTemplate mongo, TransactionTemplate transaction, Clock clock) {
-        return new MongoSummaryRepository(mongo, transaction, clock, TraceIds::currentAsUuid);
+        return new MongoSummaryRepository(mongo, transaction, clock, TraceIds::currentAsUuid,
+                CurrentTrace::traceparent);
     }
 }

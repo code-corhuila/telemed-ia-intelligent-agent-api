@@ -47,6 +47,8 @@ agent:
   question-limit: ${AGENT_QUESTION_LIMIT:8}
   # Questions the agent asks before the model may close, whatever it says.
   minimum-questions: ${AGENT_MINIMUM_QUESTIONS:4}
+  # Runbook mitigation 1: true refuses new pre-consultations (503 PRECONSULTATION_PAUSED); a restart applies it.
+  preconsultations-paused: ${AGENT_PRECONSULTATIONS_PAUSED:false}
   # Unset: no pre-consultation can start, as no appointment can be verified.
   appointments:
     base-url: ${APPOINTMENTS_BASE_URL:}
@@ -65,6 +67,10 @@ agent:
       timeout: ${GROQ_TIMEOUT:20s}
       attempts: ${GROQ_ATTEMPTS:3}
       backoff: ${GROQ_BACKOFF:300ms}
+    # Runbook mitigation 3: after this many provider failures in a row, answer 503 at once for open-for.
+    circuit:
+      failure-threshold: ${AGENT_MODEL_CIRCUIT_FAILURE_THRESHOLD:5}
+      open-for: ${AGENT_MODEL_CIRCUIT_OPEN_FOR:30s}
 
 # Week 11 log contract (CP2): one JSON line per event with trace_id, span_id and correlation_id.
 logging:

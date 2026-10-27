@@ -2,13 +2,13 @@ package com.telemed.intelligentagent.adapter.out.appointments;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.telemed.intelligentagent.adapter.observability.CurrentTrace;
 import com.telemed.intelligentagent.application.port.out.AppointmentVerificationUnavailableException;
 import com.telemed.intelligentagent.application.port.out.AppointmentsPort;
 import com.telemed.intelligentagent.domain.model.Appointment;
 import com.telemed.intelligentagent.domain.model.AppointmentStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 
 import java.io.IOException;
 import java.net.URI;
@@ -75,15 +75,14 @@ public class HttpAppointments implements AppointmentsPort {
 
     /**
      * Week 11 (CP3): the appointment service continues this request's trace, with the
-     * span this service opened (TraceContextFilter's MDC) as the parent.
+     * span this service opened as the parent.
      */
     private static HttpRequest.Builder withTraceContext(HttpRequest.Builder builder) {
-        String traceId = MDC.get("trace_id");
-        String spanId = MDC.get("span_id");
-        if (traceId != null && spanId != null) {
-            builder.header("traceparent", "00-" + traceId + "-" + spanId + "-01");
+        String traceparent = CurrentTrace.traceparent();
+        if (traceparent != null) {
+            builder.header("traceparent", traceparent);
         }
-        String correlationId = MDC.get("correlation_id");
+        String correlationId = CurrentTrace.correlationId();
         if (correlationId != null) {
             builder.header("X-Correlation-Id", correlationId);
         }
