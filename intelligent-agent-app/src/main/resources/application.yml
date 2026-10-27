@@ -18,6 +18,9 @@ server:
     connection-timeout: ${HTTP_CONNECTION_TIMEOUT:5s}
     keep-alive-timeout: ${HTTP_KEEP_ALIVE_TIMEOUT:60s}
     max-keep-alive-requests: ${HTTP_MAX_KEEP_ALIVE_REQUESTS:100}
+    # Week 11 saturation signal (CP4): tomcat_threads_busy_threads against tomcat_threads_config_max_threads.
+    mbeanregistry:
+      enabled: true
 
 # Health lives on its own port, never on the public one, and nothing else is exposed.
 management:
