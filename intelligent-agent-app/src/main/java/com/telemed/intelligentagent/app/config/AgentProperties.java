@@ -20,6 +20,7 @@ public record AgentProperties(
         @DefaultValue("4") @Min(0) @Max(20) int minimumQuestions,
         @DefaultValue @Valid @NotNull Model model,
         @DefaultValue @Valid @NotNull Appointments appointments,
+        @DefaultValue @Valid @NotNull Mongo mongo,
         // Runbook mitigation 1: refuse new pre-consultations while the agent is degraded.
         @DefaultValue("false") boolean preconsultationsPaused
 ) {
@@ -35,6 +36,21 @@ public record AgentProperties(
             String baseUrl,
             @DefaultValue("3s") @NotNull Duration timeout
     ) {
+    }
+
+    /** Runbook mitigation 4: how long a request may wait on agent-db before answering 503. */
+    public record Mongo(
+            @DefaultValue("2s") @NotNull Duration serverSelectionTimeout,
+            @DefaultValue("2s") @NotNull Duration connectTimeout,
+            @DefaultValue("5s") @NotNull Duration readTimeout
+    ) {
+
+        // Zero means "wait forever" to the driver, which is what these settings are here to prevent.
+        @AssertTrue(message = "agent-db timeouts must be positive")
+        public boolean isEveryTimeoutPositive() {
+            return serverSelectionTimeout == null || connectTimeout == null || readTimeout == null
+                    || serverSelectionTimeout.isPositive() && connectTimeout.isPositive() && readTimeout.isPositive();
+        }
     }
 
     public enum Provider {
