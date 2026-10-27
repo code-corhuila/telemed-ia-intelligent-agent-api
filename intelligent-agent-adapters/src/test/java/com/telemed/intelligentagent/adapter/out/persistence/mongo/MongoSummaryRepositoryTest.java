@@ -29,13 +29,26 @@ class MongoSummaryRepositoryTest {
     private final Conversation conversation = Conversation.start(UUID.randomUUID(), UUID.randomUUID(), 8, NOW);
     private MongoTemplate mongo;
     private MongoSummaryRepository repository;
+    // Outside a traced request there is none.
+    private String traceparent;
 
     @BeforeEach
     void freshDatabase() {
         mongo = AgentDbTestDatabase.freshTemplate();
         repository = new MongoSummaryRepository(mongo,
                 new TransactionTemplate(new MongoTransactionManager(mongo.getMongoDatabaseFactory())),
-                Clock.fixed(NOW.plusSeconds(1), ZoneOffset.UTC), () -> CORRELATION);
+                Clock.fixed(NOW.plusSeconds(1), ZoneOffset.UTC), () -> CORRELATION, () -> traceparent);
+    }
+
+    @Test
+    void recordsTheTraceContextOfTheRequestWithTheEvent() {
+        // Week 11 (CP1): the relay copies it into the broker headers, so the consumer continues the trace.
+        traceparent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+
+        repository.save(summary("Dolor de cabeza", null));
+
+        Document event = mongo.getCollection("outbox_events").find().first();
+        assertThat(event.getString("traceparent")).isEqualTo(traceparent);
     }
 
     @Test
