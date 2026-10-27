@@ -8,6 +8,7 @@ import com.telemed.intelligentagent.domain.model.Appointment;
 import com.telemed.intelligentagent.domain.model.AppointmentStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import java.io.IOException;
 import java.net.URI;
@@ -49,12 +50,12 @@ public class HttpAppointments implements AppointmentsPort {
         if (token == null || token.isBlank()) {
             throw unavailable("no caller token to relay");
         }
-        HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl + "/api/appointments/" + appointmentId))
+        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(baseUrl + "/api/appointments/" + appointmentId))
                 .timeout(timeout)
                 .header("Authorization", "Bearer " + token)
                 .header("Accept", "application/json")
-                .GET()
-                .build();
+                .GET();
+        HttpRequest request = withTraceContext(builder).build();
         HttpResponse<String> response;
         try {
             response = http.send(request, HttpResponse.BodyHandlers.ofString());
@@ -70,6 +71,23 @@ public class HttpAppointments implements AppointmentsPort {
             case 403, 404 -> Optional.empty();
             default -> throw unavailable("status " + response.statusCode());
         };
+    }
+
+    /**
+     * Week 11 (CP3): the appointment service continues this request's trace, with the
+     * span this service opened (TraceContextFilter's MDC) as the parent.
+     */
+    private static HttpRequest.Builder withTraceContext(HttpRequest.Builder builder) {
+        String traceId = MDC.get("trace_id");
+        String spanId = MDC.get("span_id");
+        if (traceId != null && spanId != null) {
+            builder.header("traceparent", "00-" + traceId + "-" + spanId + "-01");
+        }
+        String correlationId = MDC.get("correlation_id");
+        if (correlationId != null) {
+            builder.header("X-Correlation-Id", correlationId);
+        }
+        return builder;
     }
 
     private Appointment toAppointment(String body) {
