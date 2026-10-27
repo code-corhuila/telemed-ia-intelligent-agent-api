@@ -15,8 +15,12 @@ import com.telemed.intelligentagent.domain.model.Message;
 import com.telemed.intelligentagent.domain.model.Sender;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.transaction.CannotCreateTransactionException;
 
 import java.time.Instant;
 import java.util.List;
@@ -126,6 +130,26 @@ class LogEventsTest {
         assertThat(response.getBody().message()).contains("without the pre-consultation");
         assertThat(errorLogs.events("preconsultation.paused")).singleElement().satisfies(event -> assertThat(event)
                 .containsEntry("level", "WARN").containsEntry("error_code", "PRECONSULTATION_PAUSED"));
+    }
+
+    @Test
+    void answersAnUnreachableAgentDbWithA503InsteadOfAnInternalError() {
+        ApiExceptionHandler handler = new ApiExceptionHandler();
+        MockHttpServletRequest request = new MockHttpServletRequest();
+
+        ResponseEntity<ApiErrorResponse> timedOut =
+                handler.storeUnavailable(new DataAccessResourceFailureException("Timed out"), request);
+        ResponseEntity<ApiErrorResponse> noTransaction =
+                handler.storeUnavailable(new CannotCreateTransactionException("Could not start"), request);
+
+        assertThat(timedOut.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(timedOut.getBody().error()).isEqualTo("SERVICE_UNAVAILABLE");
+        assertThat(noTransaction.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(errorLogs.events("mongodb.unavailable")).hasSize(2).first().satisfies(event -> assertThat(event)
+                .containsEntry("level", "WARN")
+                .containsEntry("error_code", "SERVICE_UNAVAILABLE")
+                .containsEntry("error_type", "DataAccessResourceFailureException"));
+        assertThat(errorLogs.events("request.failed")).isEmpty();
     }
 
     private TurnController turnController() {
