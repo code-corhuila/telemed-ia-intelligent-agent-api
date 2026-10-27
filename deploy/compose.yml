@@ -36,6 +36,10 @@ services:
       # Runbook mitigation 3: provider failures in a row before answering 503 at once, and for how long.
       AGENT_MODEL_CIRCUIT_FAILURE_THRESHOLD: ${AGENT_MODEL_CIRCUIT_FAILURE_THRESHOLD:-5}
       AGENT_MODEL_CIRCUIT_OPEN_FOR: ${AGENT_MODEL_CIRCUIT_OPEN_FOR:-30s}
+      # Runbook mitigation 4: bounded waits on agent-db.
+      MONGODB_SERVER_SELECTION_TIMEOUT: ${MONGODB_SERVER_SELECTION_TIMEOUT:-2s}
+      MONGODB_CONNECT_TIMEOUT: ${MONGODB_CONNECT_TIMEOUT:-2s}
+      MONGODB_READ_TIMEOUT: ${MONGODB_READ_TIMEOUT:-5s}
 
     volumes:
       - ${JWT_PUBLIC_KEY_HOST_FILE:?Set JWT_PUBLIC_KEY_HOST_FILE}:/run/secrets/jwt-public.pem:ro
