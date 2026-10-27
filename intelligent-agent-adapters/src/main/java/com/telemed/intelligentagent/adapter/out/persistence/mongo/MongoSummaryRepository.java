@@ -4,6 +4,8 @@ import com.telemed.intelligentagent.application.port.out.SummaryRepository;
 import com.telemed.intelligentagent.domain.model.AgentDomainException;
 import com.telemed.intelligentagent.domain.model.PreConsultationSummary;
 import org.bson.Document;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -27,6 +29,8 @@ public class MongoSummaryRepository implements SummaryRepository {
 
     static final String COLLECTION = "preconsultation_summaries";
     static final String OUTBOX = "outbox_events";
+
+    private static final Logger LOG = LoggerFactory.getLogger(MongoSummaryRepository.class);
 
     private final MongoTemplate mongo;
     private final TransactionTemplate transaction;
@@ -58,10 +62,11 @@ public class MongoSummaryRepository implements SummaryRepository {
 
     @Override
     public void save(PreConsultationSummary summary) {
+        Document event = generatedEvent(summary);
         try {
             transaction.executeWithoutResult(status -> {
                 mongo.insert(toDocument(summary), COLLECTION);
-                mongo.insert(generatedEvent(summary), OUTBOX);
+                mongo.insert(event, OUTBOX);
             });
         } catch (DuplicateKeyException duplicate) {
             String detail = String.valueOf(duplicate.getMessage());
@@ -70,6 +75,13 @@ public class MongoSummaryRepository implements SummaryRepository {
             }
             throw duplicate;
         }
+        // Ids only, as in the event: the summary's clinical content is never logged.
+        LOG.atInfo()
+                .addKeyValue("event", "preconsultation.summary.generated")
+                .addKeyValue("summary_id", summary.id().toString())
+                .addKeyValue("conversation_id", summary.conversationId().toString())
+                .addKeyValue("outbox_event_id", event.getString("_id"))
+                .log("summary and its outbox event written");
     }
 
     private static Document toDocument(PreConsultationSummary summary) {
