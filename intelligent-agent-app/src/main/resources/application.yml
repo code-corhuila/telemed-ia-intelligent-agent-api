@@ -62,6 +62,10 @@ agent:
       timeout: ${GROQ_TIMEOUT:20s}
       attempts: ${GROQ_ATTEMPTS:3}
       backoff: ${GROQ_BACKOFF:300ms}
+    # Runbook mitigation 3: after this many provider failures in a row, answer 503 at once for open-for.
+    circuit:
+      failure-threshold: ${AGENT_MODEL_CIRCUIT_FAILURE_THRESHOLD:5}
+      open-for: ${AGENT_MODEL_CIRCUIT_OPEN_FOR:30s}
 
 # Week 11 log contract (CP2): one JSON line per event with trace_id, span_id and correlation_id.
 logging:
