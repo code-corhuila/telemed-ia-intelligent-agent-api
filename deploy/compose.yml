@@ -31,6 +31,9 @@ services:
       AGENT_MODEL_PROVIDER: ${AGENT_MODEL_PROVIDER:-scripted}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
+      # Runbook mitigation 3: provider failures in a row before answering 503 at once, and for how long.
+      AGENT_MODEL_CIRCUIT_FAILURE_THRESHOLD: ${AGENT_MODEL_CIRCUIT_FAILURE_THRESHOLD:-5}
+      AGENT_MODEL_CIRCUIT_OPEN_FOR: ${AGENT_MODEL_CIRCUIT_OPEN_FOR:-30s}
 
     volumes:
       - ${JWT_PUBLIC_KEY_HOST_FILE:?Set JWT_PUBLIC_KEY_HOST_FILE}:/run/secrets/jwt-public.pem:ro

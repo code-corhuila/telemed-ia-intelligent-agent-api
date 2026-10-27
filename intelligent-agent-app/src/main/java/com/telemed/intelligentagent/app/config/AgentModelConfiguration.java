@@ -1,5 +1,6 @@
 package com.telemed.intelligentagent.app.config;
 
+import com.telemed.intelligentagent.adapter.out.ai.CircuitBreakingAgentModel;
 import com.telemed.intelligentagent.adapter.out.ai.GroqAgentModel;
 import com.telemed.intelligentagent.adapter.out.ai.ScriptedAgentModel;
 import com.telemed.intelligentagent.application.port.out.AgentModelPort;
@@ -20,14 +21,17 @@ public class AgentModelConfiguration {
     }
 
     @Bean
-    AgentModelPort agentModel(AgentProperties properties) {
+    AgentModelPort agentModel(AgentProperties properties, Clock clock) {
         AgentProperties.Model model = properties.model();
         return switch (model.provider()) {
             case SCRIPTED -> new ScriptedAgentModel();
             case GROQ -> {
                 AgentProperties.Groq groq = model.groq();
-                yield new GroqAgentModel(groq.baseUrl(), groq.apiKey(), groq.model(), groq.timeout(),
-                        groq.attempts(), groq.backoff());
+                AgentProperties.Circuit circuit = model.circuit();
+                yield new CircuitBreakingAgentModel(
+                        new GroqAgentModel(groq.baseUrl(), groq.apiKey(), groq.model(), groq.timeout(),
+                                groq.attempts(), groq.backoff()),
+                        circuit.failureThreshold(), circuit.openFor(), clock);
             }
         };
     }

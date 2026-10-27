@@ -42,8 +42,21 @@ public record AgentProperties(
 
     public record Model(
             @DefaultValue("scripted") @NotNull Provider provider,
-            @DefaultValue @Valid @NotNull Groq groq
+            @DefaultValue @Valid @NotNull Groq groq,
+            @DefaultValue @Valid @NotNull Circuit circuit
     ) {
+    }
+
+    /** Runbook mitigation 3: how many provider failures in a row open the circuit, and for how long. */
+    public record Circuit(
+            @DefaultValue("5") @Min(1) @Max(50) int failureThreshold,
+            @DefaultValue("30s") @NotNull Duration openFor
+    ) {
+
+        @AssertTrue(message = "open-for must be positive")
+        public boolean isOpenForPositive() {
+            return openFor == null || openFor.isPositive();
+        }
     }
 
     public record Groq(
