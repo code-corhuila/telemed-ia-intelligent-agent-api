@@ -39,6 +39,22 @@ curl http://localhost:9086/actuator/health      # {"status":"UP"}
 | `JWT_ISSUER` | issuer of identity-api's tokens |
 | `JWT_PUBLIC_KEY_HOST_FILE` | identity-api's public key (PEM) on the host |
 
+## Observability
+
+- **Logs:** one JSON line per event with `trace_id`, `span_id` and `correlation_id`. The patient's words are never logged.
+- **Traces:** W3C `traceparent` is honoured and echoed, passed to appointment-scheduling-api and stored in the outbox event.
+- **Metrics:** `agent_requests_total` and `agent_request_duration_seconds` on `:9086/actuator/prometheus`.
+- **SLO burn-rate rules:** in `deploy/prometheus/`.
+- **Runbook controls:**
+
+  | Control | Setting |
+  |---|---|
+  | Pause new pre-consultations | `AGENT_PRECONSULTATIONS_PAUSED` |
+  | AI provider circuit breaker | `AGENT_MODEL_CIRCUIT_*` |
+  | Bounded agent-db waits | `MONGODB_*_TIMEOUT` |
+
+Details, SLOs and the runbook: [docs/observability](docs/observability/README.md).
+
 ## Branching
 
 `develop`, `qa` and `main` take no direct commits. Work goes through short-lived branches and
