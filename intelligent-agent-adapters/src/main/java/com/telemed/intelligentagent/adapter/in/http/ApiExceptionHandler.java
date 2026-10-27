@@ -7,10 +7,13 @@ import com.telemed.intelligentagent.domain.model.AgentDomainException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -56,6 +59,19 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 .addKeyValue("event", "dependency.unavailable")
                 .addKeyValue("error_code", "SERVICE_UNAVAILABLE")
                 .log("dependency unavailable: {}", exception.getMessage());
+        return error(HttpStatus.SERVICE_UNAVAILABLE, "SERVICE_UNAVAILABLE",
+                "The pre-consultation is not available right now. Try again in a moment.", List.of(), request);
+    }
+
+    /** agent-db did not answer in time (or at all): the same 503 as any other dependency, never a 500. */
+    @ExceptionHandler({DataAccessResourceFailureException.class, QueryTimeoutException.class,
+            CannotCreateTransactionException.class})
+    ResponseEntity<ApiErrorResponse> storeUnavailable(RuntimeException exception, HttpServletRequest request) {
+        LOG.atWarn()
+                .addKeyValue("event", "mongodb.unavailable")
+                .addKeyValue("error_code", "SERVICE_UNAVAILABLE")
+                .addKeyValue("error_type", exception.getClass().getSimpleName())
+                .log("agent-db unavailable");
         return error(HttpStatus.SERVICE_UNAVAILABLE, "SERVICE_UNAVAILABLE",
                 "The pre-consultation is not available right now. Try again in a moment.", List.of(), request);
     }

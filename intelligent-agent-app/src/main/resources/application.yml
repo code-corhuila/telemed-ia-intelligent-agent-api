@@ -51,6 +51,11 @@ agent:
   appointments:
     base-url: ${APPOINTMENTS_BASE_URL:}
     timeout: ${APPOINTMENTS_TIMEOUT:3s}
+  # Runbook mitigation 4: bounded waits on agent-db, so a stalled database answers 503 in seconds.
+  mongo:
+    server-selection-timeout: ${MONGODB_SERVER_SELECTION_TIMEOUT:2s}
+    connect-timeout: ${MONGODB_CONNECT_TIMEOUT:2s}
+    read-timeout: ${MONGODB_READ_TIMEOUT:5s}
   model:
     provider: ${AGENT_MODEL_PROVIDER:scripted}
     groq:

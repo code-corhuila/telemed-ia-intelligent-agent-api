@@ -31,6 +31,10 @@ services:
       AGENT_MODEL_PROVIDER: ${AGENT_MODEL_PROVIDER:-scripted}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
+      # Runbook mitigation 4: bounded waits on agent-db.
+      MONGODB_SERVER_SELECTION_TIMEOUT: ${MONGODB_SERVER_SELECTION_TIMEOUT:-2s}
+      MONGODB_CONNECT_TIMEOUT: ${MONGODB_CONNECT_TIMEOUT:-2s}
+      MONGODB_READ_TIMEOUT: ${MONGODB_READ_TIMEOUT:-5s}
 
     volumes:
       - ${JWT_PUBLIC_KEY_HOST_FILE:?Set JWT_PUBLIC_KEY_HOST_FILE}:/run/secrets/jwt-public.pem:ro
