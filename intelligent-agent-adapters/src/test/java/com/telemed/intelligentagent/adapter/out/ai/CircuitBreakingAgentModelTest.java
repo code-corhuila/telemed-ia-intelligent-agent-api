@@ -63,8 +63,10 @@ class CircuitBreakingAgentModelTest {
         model.nextTurn(TRANSCRIPT);
         provider.failing = true;
         failTwice();
+        provider.failing = false;
 
-        assertThatThrownBy(() -> model.nextTurn(TRANSCRIPT)).isInstanceOf(AgentModelUnavailableException.class);
+        // Without the reset, the fourth call would have opened the circuit and this one would be refused.
+        assertThat(model.nextTurn(TRANSCRIPT).message()).isEqualTo("next question");
         assertThat(provider.calls).isEqualTo(6);
         assertThat(logs.events("agent.model.circuit.opened")).isEmpty();
     }
