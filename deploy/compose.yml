@@ -27,6 +27,8 @@ services:
 
       AGENT_QUESTION_LIMIT: ${AGENT_QUESTION_LIMIT:-8}
       AGENT_MINIMUM_QUESTIONS: ${AGENT_MINIMUM_QUESTIONS:-4}
+      # Runbook mitigation 1: set true and recreate the container to pause new pre-consultations.
+      AGENT_PRECONSULTATIONS_PAUSED: ${AGENT_PRECONSULTATIONS_PAUSED:-false}
       # scripted (no key) or groq (needs GROQ_API_KEY from the gitignored .env).
       AGENT_MODEL_PROVIDER: ${AGENT_MODEL_PROVIDER:-scripted}
       GROQ_API_KEY: ${GROQ_API_KEY:-}

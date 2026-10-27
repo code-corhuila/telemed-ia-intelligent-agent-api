@@ -19,7 +19,9 @@ public record AgentProperties(
         @DefaultValue("8") @Min(1) @Max(20) int questionLimit,
         @DefaultValue("4") @Min(0) @Max(20) int minimumQuestions,
         @DefaultValue @Valid @NotNull Model model,
-        @DefaultValue @Valid @NotNull Appointments appointments
+        @DefaultValue @Valid @NotNull Appointments appointments,
+        // Runbook mitigation 1: refuse new pre-consultations while the agent is degraded.
+        @DefaultValue("false") boolean preconsultationsPaused
 ) {
 
     /** The agent may never be required to ask more than it is allowed to. */

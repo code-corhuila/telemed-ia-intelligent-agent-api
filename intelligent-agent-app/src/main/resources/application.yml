@@ -47,6 +47,8 @@ agent:
   question-limit: ${AGENT_QUESTION_LIMIT:8}
   # Questions the agent asks before the model may close, whatever it says.
   minimum-questions: ${AGENT_MINIMUM_QUESTIONS:4}
+  # Runbook mitigation 1: true refuses new pre-consultations (503 PRECONSULTATION_PAUSED); a restart applies it.
+  preconsultations-paused: ${AGENT_PRECONSULTATIONS_PAUSED:false}
   # Unset: no pre-consultation can start, as no appointment can be verified.
   appointments:
     base-url: ${APPOINTMENTS_BASE_URL:}
