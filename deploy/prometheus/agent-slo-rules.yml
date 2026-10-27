@@ -1,0 +1,134 @@
+# Week 11 SLOs (CP6), burn-rate alerts (CP7) and the incident drill follow-up (CP9) for
+# intelligent-agent-api. Metrics come from the management port (/actuator/prometheus).
+# Tested with: promtool test rules deploy/prometheus/agent-slo-rules.test.yml
+#
+# SLO 1  availability     99.0 % of /api/v1/agent requests not 5xx        budget 1 %
+# SLO 2  message latency  95 % of message turns within 4 s                 budget 5 %
+# SLO 4  finish latency   99 % of finishes within 1 s (CP9 action item 1)  budget 1 %
+# (SLO 3, summary freshness, needs the outbox relay's publish delay metric, which does not exist yet.)
+groups:
+  - name: intelligent-agent-api-slo-ratios
+    rules:
+      - record: agent:error_ratio:rate5m
+        expr: sum(rate(agent_requests_total{outcome="error"}[5m])) / sum(rate(agent_requests_total[5m]))
+      - record: agent:error_ratio:rate30m
+        expr: sum(rate(agent_requests_total{outcome="error"}[30m])) / sum(rate(agent_requests_total[30m]))
+      - record: agent:error_ratio:rate1h
+        expr: sum(rate(agent_requests_total{outcome="error"}[1h])) / sum(rate(agent_requests_total[1h]))
+      - record: agent:error_ratio:rate6h
+        expr: sum(rate(agent_requests_total{outcome="error"}[6h])) / sum(rate(agent_requests_total[6h]))
+
+      # Micrometer publishes le="4.0", not le="4" (checked by MetricsEndpointTest).
+      - record: agent:message_slow_ratio:rate5m
+        expr: |
+          1 - sum(rate(agent_request_duration_seconds_bucket{route="/api/v1/agent/conversations/{id}/messages",le="4.0"}[5m]))
+            / sum(rate(agent_request_duration_seconds_count{route="/api/v1/agent/conversations/{id}/messages"}[5m]))
+      - record: agent:message_slow_ratio:rate30m
+        expr: |
+          1 - sum(rate(agent_request_duration_seconds_bucket{route="/api/v1/agent/conversations/{id}/messages",le="4.0"}[30m]))
+            / sum(rate(agent_request_duration_seconds_count{route="/api/v1/agent/conversations/{id}/messages"}[30m]))
+      - record: agent:message_slow_ratio:rate1h
+        expr: |
+          1 - sum(rate(agent_request_duration_seconds_bucket{route="/api/v1/agent/conversations/{id}/messages",le="4.0"}[1h]))
+            / sum(rate(agent_request_duration_seconds_count{route="/api/v1/agent/conversations/{id}/messages"}[1h]))
+      - record: agent:message_slow_ratio:rate6h
+        expr: |
+          1 - sum(rate(agent_request_duration_seconds_bucket{route="/api/v1/agent/conversations/{id}/messages",le="4.0"}[6h]))
+            / sum(rate(agent_request_duration_seconds_count{route="/api/v1/agent/conversations/{id}/messages"}[6h]))
+
+      - record: agent:finish_slow_ratio:rate2m
+        expr: |
+          1 - sum(rate(agent_request_duration_seconds_bucket{route="/api/v1/agent/conversations/{id}/finish",le="1.0"}[2m]))
+            / sum(rate(agent_request_duration_seconds_count{route="/api/v1/agent/conversations/{id}/finish"}[2m]))
+      - record: agent:finish_slow_ratio:rate10m
+        expr: |
+          1 - sum(rate(agent_request_duration_seconds_bucket{route="/api/v1/agent/conversations/{id}/finish",le="1.0"}[10m]))
+            / sum(rate(agent_request_duration_seconds_count{route="/api/v1/agent/conversations/{id}/finish"}[10m]))
+
+  - name: intelligent-agent-api-slo-alerts
+    rules:
+      # 14.4x for 1 h spends 2 % of the 30-day budget (12 of 600 failed requests).
+      - alert: AgentAvailabilityFastBurn
+        expr: |
+          agent:error_ratio:rate1h > (14.4 * 0.01)
+          and
+          agent:error_ratio:rate5m > (14.4 * 0.01)
+        for: 5m
+        labels:
+          severity: page
+          team: telemed-ia-group-2
+          service: intelligent-agent-api
+          slo: availability
+        annotations:
+          summary: "intelligent-agent-api is burning the availability error budget 14.4x too fast (2 % of the 30-day budget in 1 hour)"
+          description: "More than 14.4 % of /api/v1/agent requests failed with 5xx in the last hour and in the last 5 minutes."
+          runbook_url: "https://github.com/code-corhuila/telemed-ia-intelligent-agent-api/blob/develop/docs/observability/runbook.md#agentavailabilityfastburn"
+
+      # 6x for 6 h spends 5 % of the budget (30 failed requests).
+      - alert: AgentAvailabilitySlowBurn
+        expr: |
+          agent:error_ratio:rate6h > (6 * 0.01)
+          and
+          agent:error_ratio:rate30m > (6 * 0.01)
+        for: 30m
+        labels:
+          severity: ticket
+          team: telemed-ia-group-2
+          service: intelligent-agent-api
+          slo: availability
+        annotations:
+          summary: "intelligent-agent-api is burning the availability error budget 6x too fast (5 % of the 30-day budget in 6 hours)"
+          description: "More than 6 % of /api/v1/agent requests failed with 5xx in the last 6 hours and in the last 30 minutes."
+          runbook_url: "https://github.com/code-corhuila/telemed-ia-intelligent-agent-api/blob/develop/docs/observability/runbook.md#agentavailabilityfastburn"
+
+      - alert: AgentMessageLatencyFastBurn
+        expr: |
+          agent:message_slow_ratio:rate1h > (14.4 * 0.05)
+          and
+          agent:message_slow_ratio:rate5m > (14.4 * 0.05)
+        for: 5m
+        labels:
+          severity: page
+          team: telemed-ia-group-2
+          service: intelligent-agent-api
+          slo: message-latency
+        annotations:
+          summary: "Message turns are slow: burning the latency error budget 14.4x too fast"
+          description: "More than 72 % of POST /api/v1/agent/conversations/{id}/messages took longer than 4 s in the last hour and in the last 5 minutes."
+          runbook_url: "https://github.com/code-corhuila/telemed-ia-intelligent-agent-api/blob/develop/docs/observability/runbook.md#agentmessagelatencyfastburn"
+
+      - alert: AgentMessageLatencySlowBurn
+        expr: |
+          agent:message_slow_ratio:rate6h > (6 * 0.05)
+          and
+          agent:message_slow_ratio:rate30m > (6 * 0.05)
+        for: 30m
+        labels:
+          severity: ticket
+          team: telemed-ia-group-2
+          service: intelligent-agent-api
+          slo: message-latency
+        annotations:
+          summary: "Message turns are slow: burning the latency error budget 6x too fast"
+          description: "More than 30 % of POST /api/v1/agent/conversations/{id}/messages took longer than 4 s in the last 6 hours and in the last 30 minutes."
+          runbook_url: "https://github.com/code-corhuila/telemed-ia-intelligent-agent-api/blob/develop/docs/observability/runbook.md#agentmessagelatencyfastburn"
+
+      # CP9 action item 1: in the drill, the availability page came at minute 40. Short windows make a
+      # slow dependency page in under 10 minutes; at least 5 finishes in 10 minutes keeps night traffic quiet.
+      - alert: AgentFinishLatencyFastBurn
+        expr: |
+          agent:finish_slow_ratio:rate10m > (14.4 * 0.01)
+          and
+          agent:finish_slow_ratio:rate2m > (14.4 * 0.01)
+          and
+          sum(increase(agent_request_duration_seconds_count{route="/api/v1/agent/conversations/{id}/finish"}[10m])) >= 5
+        for: 2m
+        labels:
+          severity: page
+          team: telemed-ia-group-2
+          service: intelligent-agent-api
+          slo: finish-latency
+        annotations:
+          summary: "Pre-consultation finishes are slow: more than 14.4 % above 1 s in the last 10 minutes"
+          description: "POST /api/v1/agent/conversations/{id}/finish is burning its latency budget (99 % within 1 s) 14.4x too fast; a slow MongoDB intelligent_agent or AI provider is the usual cause."
+          runbook_url: "https://github.com/code-corhuila/telemed-ia-intelligent-agent-api/blob/develop/docs/observability/runbook.md#agentfinishlatencyfastburn"
