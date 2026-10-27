@@ -36,13 +36,16 @@ public class MongoSummaryRepository implements SummaryRepository {
     private final TransactionTemplate transaction;
     private final Clock clock;
     private final Supplier<UUID> correlationIds;
+    private final Supplier<String> traceparents;
 
+    /** traceparents gives the W3C trace context of the request being served, or null outside one. */
     public MongoSummaryRepository(MongoTemplate mongo, TransactionTemplate transaction, Clock clock,
-                                  Supplier<UUID> correlationIds) {
+                                  Supplier<UUID> correlationIds, Supplier<String> traceparents) {
         this.mongo = mongo;
         this.transaction = transaction;
         this.clock = clock;
         this.correlationIds = correlationIds;
+        this.traceparents = traceparents;
     }
 
     @Override
@@ -100,7 +103,7 @@ public class MongoSummaryRepository implements SummaryRepository {
     /** Ids only: the clinical content never leaves agent-db through the event. */
     private Document generatedEvent(PreConsultationSummary summary) {
         Date generatedAt = Date.from(summary.createdAt());
-        return new Document("_id", UUID.randomUUID().toString())
+        Document event = new Document("_id", UUID.randomUUID().toString())
                 .append("eventType", "PreConsultationSummaryGenerated")
                 .append("aggregateType", "PRECONSULTATION_SUMMARY")
                 .append("aggregateId", summary.id().toString())
@@ -113,6 +116,13 @@ public class MongoSummaryRepository implements SummaryRepository {
                         .append("patientId", summary.patientId().toString())
                         .append("conversationId", summary.conversationId().toString())
                         .append("generatedAt", generatedAt));
+        // Week 11 (CP1): the relay copies it into the broker headers, so the consumer continues the
+        // trace; agent-db accepts it as an optional field (changeset hu-06-010).
+        String traceparent = traceparents.get();
+        if (traceparent != null) {
+            event.append("traceparent", traceparent);
+        }
+        return event;
     }
 
     private static void appendIfPresent(Document document, String field, String value) {
