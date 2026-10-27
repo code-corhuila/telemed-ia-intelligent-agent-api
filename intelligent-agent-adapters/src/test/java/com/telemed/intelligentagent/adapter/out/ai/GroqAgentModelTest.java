@@ -3,6 +3,7 @@ package com.telemed.intelligentagent.adapter.out.ai;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
+import com.telemed.intelligentagent.adapter.CapturedLogs;
 import com.telemed.intelligentagent.application.port.out.AgentModelPort.AgentReply;
 import com.telemed.intelligentagent.application.port.out.AgentModelPort.SummaryDraft;
 import com.telemed.intelligentagent.application.port.out.AgentModelPort.Turn;
@@ -40,6 +41,7 @@ class GroqAgentModelTest {
     private final Deque<String> errorBodies = new ArrayDeque<>();
     private final List<JsonNode> requests = new ArrayList<>();
     private final List<String> authorizations = new ArrayList<>();
+    private long delayMillis;
     private HttpServer server;
     private GroqAgentModel model;
 
@@ -49,6 +51,11 @@ class GroqAgentModelTest {
         server.createContext("/openai/v1/chat/completions", exchange -> {
             requests.add(json.readTree(exchange.getRequestBody()));
             authorizations.add(exchange.getRequestHeaders().getFirst("Authorization"));
+            try {
+                Thread.sleep(delayMillis);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
             int status = statuses.isEmpty() ? 200 : statuses.pop()[0];
             String body = status == 200
                     ? json.writeValueAsString(json.createObjectNode().set("choices", json.createArrayNode()
@@ -170,6 +177,38 @@ class GroqAgentModelTest {
         contents.add("not json at all");
 
         assertThatThrownBy(() -> model.nextTurn(TRANSCRIPT)).isInstanceOf(AgentModelUnavailableException.class);
+    }
+
+    @Test
+    void logsEachCallWithItsDurationButNeverThePatientsWords() {
+        statuses.add(new int[] {503});
+        contents.add("{\"message\":\"¿Qué tan intenso es?\",\"enoughInformation\":false}");
+
+        try (CapturedLogs logs = CapturedLogs.of(GroqAgentModel.class)) {
+            model.nextTurn(TRANSCRIPT);
+
+            assertThat(logs.events("agent.model.failed")).singleElement().satisfies(event -> assertThat(event)
+                    .containsEntry("level", "WARN").containsEntry("status", 503).containsEntry("attempt", 1)
+                    .containsKey("duration_ms"));
+            assertThat(logs.events("agent.model.responded")).singleElement().satisfies(event -> assertThat(event)
+                    .containsEntry("level", "INFO").containsEntry("attempt", 2).containsKey("duration_ms"));
+            assertThat(logs.everything()).doesNotContain("Me duele").doesNotContain("intenso").doesNotContain(KEY);
+        }
+    }
+
+    @Test
+    void logsATimeoutOfTheProvider() {
+        delayMillis = 400;
+        GroqAgentModel impatient = new GroqAgentModel(
+                "http://127.0.0.1:" + server.getAddress().getPort() + "/openai/v1", KEY, "openai/gpt-oss-20b",
+                Duration.ofMillis(100), 1, Duration.ofMillis(1));
+
+        try (CapturedLogs logs = CapturedLogs.of(GroqAgentModel.class)) {
+            assertThatThrownBy(() -> impatient.nextTurn(TRANSCRIPT)).isInstanceOf(AgentModelUnavailableException.class);
+
+            assertThat(logs.events("agent.model.timeout")).singleElement().satisfies(event -> assertThat(event)
+                    .containsEntry("level", "WARN").containsEntry("attempt", 1).containsKey("duration_ms"));
+        }
     }
 
     @Test
