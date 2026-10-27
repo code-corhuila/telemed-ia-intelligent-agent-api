@@ -5,6 +5,8 @@ import com.telemed.intelligentagent.application.port.out.MessageRepository;
 import com.telemed.intelligentagent.domain.model.Conversation;
 import com.telemed.intelligentagent.domain.model.Message;
 import com.telemed.intelligentagent.domain.model.Sender;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,6 +54,8 @@ class TracePropagationTest {
     private MessageRepository messages;
     @Autowired
     private MongoTemplate mongo;
+    @Autowired
+    private MeterRegistry registry;
 
     @LocalServerPort
     private int port;
@@ -99,6 +103,7 @@ class TracePropagationTest {
     @Test
     void finishingTwiceKeepsTheFirstTraceAndIsMeasured() throws InterruptedException {
         Conversation conversation = activeConversation();
+        double before = finishedSuccessfully();
         finish(conversation.id(), INCOMING);
 
         // The real API is idempotent here (the workshop prototype answered 409): same summary, no new event.
@@ -108,9 +113,10 @@ class TracePropagationTest {
         assertThat(mongo.getCollection("outbox_events").countDocuments()).isEqualTo(1);
         assertThat(traceIdOf(mongo.getCollection("outbox_events").find().first().getString("traceparent")))
                 .isEqualTo(TRACE_ID);
-        assertThat(scrapeOnceRecorded("outcome=\"success\",route=\"/api/v1/agent/conversations/{id}/finish\"} 2.0"))
+        assertThat(finishedSuccessfullyOnceAtLeast(before + 2)).isEqualTo(before + 2);
+        assertThat(http.getForObject("http://localhost:" + managementPort + "/actuator/prometheus", String.class))
                 .contains("agent_requests_total{method=\"POST\",outcome=\"success\","
-                        + "route=\"/api/v1/agent/conversations/{id}/finish\"} 2.0");
+                        + "route=\"/api/v1/agent/conversations/{id}/finish\"}");
     }
 
     private Conversation activeConversation() {
@@ -133,17 +139,20 @@ class TracePropagationTest {
                 HttpMethod.POST, new HttpEntity<>(headers), String.class);
     }
 
-    /** The metrics filter records a request after its response is sent; a fast scrape may come first. */
-    private String scrapeOnceRecorded(String series) throws InterruptedException {
-        String body = "";
-        for (int attempt = 0; attempt < 20; attempt++) {
-            body = http.getForObject("http://localhost:" + managementPort + "/actuator/prometheus", String.class);
-            if (body != null && body.contains(series)) {
-                return body;
-            }
+    /** agent_requests_total for successful finishes; the tests share one registry, so they compare deltas. */
+    private double finishedSuccessfully() {
+        Counter counter = registry.find("agent.requests")
+                .tags("route", "/api/v1/agent/conversations/{id}/finish", "outcome", "success")
+                .counter();
+        return counter == null ? 0 : counter.count();
+    }
+
+    /** The metrics filter records a request after its response is sent, so the count may lag briefly. */
+    private double finishedSuccessfullyOnceAtLeast(double expected) throws InterruptedException {
+        for (int attempt = 0; attempt < 20 && finishedSuccessfully() < expected; attempt++) {
             Thread.sleep(100);
         }
-        return body;
+        return finishedSuccessfully();
     }
 
     private static String traceIdOf(String traceparent) {
