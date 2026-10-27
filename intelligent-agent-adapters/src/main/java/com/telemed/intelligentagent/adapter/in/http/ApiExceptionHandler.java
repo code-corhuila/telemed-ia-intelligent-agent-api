@@ -43,12 +43,19 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         if (status == HttpStatus.INTERNAL_SERVER_ERROR) {
             return internalError(exception, request);
         }
+        LOG.atWarn()
+                .addKeyValue("event", "request.rejected")
+                .addKeyValue("error_code", exception.reason().name())
+                .log("request rejected by a pre-consultation rule");
         return error(status, exception.reason().name(), exception.getMessage(), List.of(), request);
     }
 
     @ExceptionHandler({AgentModelUnavailableException.class, AppointmentVerificationUnavailableException.class})
     ResponseEntity<ApiErrorResponse> unavailable(RuntimeException exception, HttpServletRequest request) {
-        LOG.warn("Dependency unavailable: {}", exception.getMessage());
+        LOG.atWarn()
+                .addKeyValue("event", "dependency.unavailable")
+                .addKeyValue("error_code", "SERVICE_UNAVAILABLE")
+                .log("dependency unavailable: {}", exception.getMessage());
         return error(HttpStatus.SERVICE_UNAVAILABLE, "SERVICE_UNAVAILABLE",
                 "The pre-consultation is not available right now. Try again in a moment.", List.of(), request);
     }
@@ -60,7 +67,11 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiErrorResponse> internalError(Exception exception, HttpServletRequest request) {
-        LOG.error("Unexpected error [traceId={}]", TraceIds.of(request), exception);
+        LOG.atError()
+                .addKeyValue("event", "request.failed")
+                .addKeyValue("error_code", "INTERNAL_ERROR")
+                .setCause(exception)
+                .log("unexpected error");
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Something went wrong.", List.of(),
                 request);
     }
