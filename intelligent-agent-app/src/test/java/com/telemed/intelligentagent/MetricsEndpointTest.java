@@ -53,6 +53,17 @@ class MetricsEndpointTest {
     }
 
     @Test
+    void exposesTheSaturationOfTheRequestThreads() {
+        ResponseEntity<String> scrape = http.getForEntity(
+                "http://localhost:" + managementPort + "/actuator/prometheus", String.class);
+
+        // CP4 saturation: max(tomcat_threads_busy_threads) / max(tomcat_threads_config_max_threads).
+        assertThat(scrape.getBody())
+                .contains("tomcat_threads_busy_threads{")
+                .contains("tomcat_threads_config_max_threads{");
+    }
+
+    @Test
     void neverServesMetricsOnThePublicPort() {
         ResponseEntity<String> scrape = http.getForEntity(
                 "http://localhost:" + port + "/actuator/prometheus", String.class);
