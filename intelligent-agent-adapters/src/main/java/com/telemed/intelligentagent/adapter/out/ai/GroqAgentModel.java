@@ -8,6 +8,8 @@ import com.telemed.intelligentagent.application.port.out.AgentModelPort;
 import com.telemed.intelligentagent.application.port.out.AgentModelUnavailableException;
 import com.telemed.intelligentagent.domain.model.Sender;
 import com.telemed.intelligentagent.domain.safety.AgentInstructions;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,9 +49,16 @@ public class GroqAgentModel implements AgentModelPort {
     private final Duration timeout;
     private final int attempts;
     private final Duration backoffBase;
+    private final ObservationRegistry registry;
 
     public GroqAgentModel(String baseUrl, String apiKey, String model, Duration timeout, int attempts,
                           Duration backoffBase) {
+        this(baseUrl, apiKey, model, timeout, attempts, backoffBase, ObservationRegistry.NOOP);
+    }
+
+    public GroqAgentModel(String baseUrl, String apiKey, String model, Duration timeout, int attempts,
+                          Duration backoffBase, ObservationRegistry registry) {
+        this.registry = registry;
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException("The AI provider is enabled but GROQ_API_KEY is not set.");
         }
@@ -116,6 +125,7 @@ public class GroqAgentModel implements AgentModelPort {
     /**
      * Bounded retries with full-jitter backoff, only for network errors, 429,
      * 5xx and output the model generated badly (see UNPARSABLE_GENERATION).
+     * Each attempt is a span (week 11 traces), so Jaeger shows the retries and their waits.
      */
     private JsonNode send(ObjectNode body) {
         HttpRequest request = HttpRequest.newBuilder(endpoint)
@@ -127,8 +137,14 @@ public class GroqAgentModel implements AgentModelPort {
         for (int attempt = 1; ; attempt++) {
             boolean retryable;
             long started = System.nanoTime();
+            // Only the outcome and attempt: no prompt, answer or key ever goes into a span.
+            Observation observation = Observation.createNotStarted("agent.model.request", registry)
+                    .contextualName("groq chat completion")
+                    .lowCardinalityKeyValue("attempt", String.valueOf(attempt))
+                    .start();
             try {
                 HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+                observation.lowCardinalityKeyValue("outcome", outcomeOf(response.statusCode()));
                 if (response.statusCode() == 200) {
                     LOG.atInfo()
                             .addKeyValue("event", "agent.model.responded")
@@ -149,6 +165,7 @@ public class GroqAgentModel implements AgentModelPort {
                 retryable = response.statusCode() == 429 || response.statusCode() >= 500
                         || UNPARSABLE_GENERATION.contains(errorCode);
             } catch (HttpTimeoutException e) {
+                observation.lowCardinalityKeyValue("outcome", "timeout");
                 LOG.atWarn()
                         .addKeyValue("event", "agent.model.timeout")
                         .addKeyValue("attempt", attempt)
@@ -156,6 +173,7 @@ public class GroqAgentModel implements AgentModelPort {
                         .log("AI provider did not answer in time");
                 retryable = true;
             } catch (IOException e) {
+                observation.lowCardinalityKeyValue("outcome", "unreachable");
                 LOG.atWarn()
                         .addKeyValue("event", "agent.model.unreachable")
                         .addKeyValue("error_type", e.getClass().getSimpleName())
@@ -164,14 +182,27 @@ public class GroqAgentModel implements AgentModelPort {
                         .log("AI provider unreachable");
                 retryable = true;
             } catch (InterruptedException e) {
+                observation.lowCardinalityKeyValue("outcome", "interrupted");
                 Thread.currentThread().interrupt();
                 throw new AgentModelUnavailableException("The AI provider call was interrupted.");
+            } finally {
+                observation.stop();
             }
             if (!retryable || attempt >= attempts) {
                 throw new AgentModelUnavailableException("The AI provider is not available right now.");
             }
             pause(attempt);
         }
+    }
+
+    private static String outcomeOf(int status) {
+        if (status == 200) {
+            return "success";
+        }
+        if (status == 429) {
+            return "rate_limited";
+        }
+        return status >= 500 ? "server_error" : "client_error";
     }
 
     private static long millisSince(long startedNanos) {

@@ -3,6 +3,8 @@ package com.telemed.intelligentagent.app.config;
 import com.telemed.intelligentagent.adapter.out.appointments.HttpAppointments;
 import com.telemed.intelligentagent.adapter.out.appointments.UnverifiedAppointments;
 import com.telemed.intelligentagent.application.port.out.AppointmentsPort;
+import io.micrometer.observation.ObservationRegistry;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.core.Authentication;
@@ -14,13 +16,13 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 public class AppointmentsConfiguration {
 
     @Bean
-    AppointmentsPort appointments(AgentProperties properties) {
+    AppointmentsPort appointments(AgentProperties properties, ObjectProvider<ObservationRegistry> registry) {
         AgentProperties.Appointments appointments = properties.appointments();
         if (appointments.baseUrl() == null || appointments.baseUrl().isBlank()) {
             return new UnverifiedAppointments();
         }
         return new HttpAppointments(appointments.baseUrl(), appointments.timeout(),
-                AppointmentsConfiguration::currentPatientToken);
+                AppointmentsConfiguration::currentPatientToken, registry.getIfAvailable(() -> ObservationRegistry.NOOP));
     }
 
     /** The token of the request being served; never a token of the agent's own. */
