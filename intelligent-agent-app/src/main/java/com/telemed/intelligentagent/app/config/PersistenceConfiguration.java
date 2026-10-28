@@ -2,6 +2,7 @@ package com.telemed.intelligentagent.app.config;
 
 import com.telemed.intelligentagent.adapter.in.http.TraceIds;
 import com.telemed.intelligentagent.adapter.observability.CurrentTrace;
+import com.telemed.intelligentagent.adapter.observability.ObservedUnitOfWork;
 import com.telemed.intelligentagent.adapter.out.persistence.mongo.MongoConversationRepository;
 import com.telemed.intelligentagent.adapter.out.persistence.mongo.MongoIdempotencyRecords;
 import com.telemed.intelligentagent.adapter.out.persistence.mongo.MongoMessageRepository;
@@ -11,6 +12,8 @@ import com.telemed.intelligentagent.application.port.out.IdempotencyRecords;
 import com.telemed.intelligentagent.application.port.out.MessageRepository;
 import com.telemed.intelligentagent.application.port.out.SummaryRepository;
 import com.telemed.intelligentagent.application.port.out.UnitOfWork;
+import io.micrometer.observation.ObservationRegistry;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.mongodb.MongoDatabaseFactory;
@@ -35,9 +38,11 @@ public class PersistenceConfiguration {
         return new TransactionTemplate(transactionManager);
     }
 
+    // The span wraps the transaction, not each command: the outbox gauge's scrapes open no traces of their own.
     @Bean
-    UnitOfWork unitOfWork(TransactionTemplate transaction) {
-        return work -> transaction.executeWithoutResult(status -> work.run());
+    UnitOfWork unitOfWork(TransactionTemplate transaction, ObjectProvider<ObservationRegistry> registry) {
+        return new ObservedUnitOfWork(work -> transaction.executeWithoutResult(status -> work.run()),
+                registry.getIfAvailable(() -> ObservationRegistry.NOOP));
     }
 
     @Bean
