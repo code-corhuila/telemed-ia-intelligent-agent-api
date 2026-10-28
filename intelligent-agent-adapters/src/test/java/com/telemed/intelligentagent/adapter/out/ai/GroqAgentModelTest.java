@@ -10,6 +10,8 @@ import com.telemed.intelligentagent.application.port.out.AgentModelPort.Turn;
 import com.telemed.intelligentagent.application.port.out.AgentModelUnavailableException;
 import com.telemed.intelligentagent.domain.model.Sender;
 import com.telemed.intelligentagent.domain.safety.AgentInstructions;
+import io.micrometer.observation.tck.TestObservationRegistry;
+import io.micrometer.observation.tck.TestObservationRegistryAssert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -130,6 +132,22 @@ class GroqAgentModelTest {
 
         assertThat(model.nextTurn(TRANSCRIPT).enoughInformation()).isTrue();
         assertThat(requests).hasSize(3);
+    }
+
+    @Test
+    void opensOneSpanPerAttemptSoJaegerShowsTheRetries() {
+        TestObservationRegistry registry = TestObservationRegistry.create();
+        GroqAgentModel observed = new GroqAgentModel("http://127.0.0.1:" + server.getAddress().getPort() + "/openai/v1",
+                KEY, "openai/gpt-oss-20b", Duration.ofSeconds(2), 3, Duration.ofMillis(1), registry);
+        statuses.add(new int[] {503});
+        contents.add("{\"message\":\"¿Algo más?\",\"enoughInformation\":true}");
+
+        observed.nextTurn(TRANSCRIPT);
+
+        TestObservationRegistryAssert.assertThat(registry)
+                .hasNumberOfObservationsWithNameEqualTo("agent.model.request", 2)
+                .hasAnObservationWithAKeyValue("outcome", "server_error")
+                .hasAnObservationWithAKeyValue("outcome", "success");
     }
 
     @Test
