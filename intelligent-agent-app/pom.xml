@@ -34,6 +34,16 @@
       <groupId>io.micrometer</groupId>
       <artifactId>micrometer-registry-prometheus</artifactId>
     </dependency>
+    <!-- Week 11 traces: spans over OTLP to the platform collector, which feeds Jaeger. -->
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-tracing-bridge-otel</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-exporter-otlp</artifactId>
+      <scope>runtime</scope>
+    </dependency>
     <!-- agent-db: client, health indicator and transactions. -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
