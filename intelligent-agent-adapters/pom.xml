@@ -30,6 +30,11 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
     </dependency>
+    <!-- Tracing API only: the request span's ids, whatever the tracer behind them. -->
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-tracing</artifactId>
+    </dependency>
     <!-- Optional: the app opts into Mongo (client, health, transactions) when it wires persistence. -->
     <dependency>
       <groupId>org.springframework.data</groupId>
