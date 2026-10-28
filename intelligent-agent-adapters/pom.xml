@@ -61,5 +61,11 @@
       <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- Records the observations (the spans exported to Jaeger) the adapters open. -->
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-observation-test</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>
