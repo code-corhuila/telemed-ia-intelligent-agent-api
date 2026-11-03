@@ -1,18 +1,21 @@
 # CP7 — Burn-rate alert policy
 
-Rules: `deploy/prometheus/agent-slo-rules.yml`. Scenarios: `agent-slo-rules.test.yml` (run them with
-promtool, see [README.md](README.md)). Every alert has `severity`, `team`, `service`, `slo`,
-`summary`, `description` and a `runbook_url` that points to [runbook.md](runbook.md).
+Rules: `telemed-ia-infra-postgres/observability/rules/intelligent-agent.yml`. Scenarios:
+`tests/prometheus/intelligent-agent.test.yml` in the same repository (run them with promtool, see
+[README.md](README.md)). Every alert has `severity` (`critical` pages, `warning` opens a ticket),
+`team`, `owner`, `service`, `slo`, `summary`, `description` and a `runbook_url` that points to the
+service runbook in `telemed-ia-docs`. While a fast burn pages, Alertmanager inhibits the slow burn of
+the same SLO.
 
 Budget consumed when an alert fires = burn rate × long window / 30 days.
 
 | Alert | SLO | Burn | Threshold | Windows (long / short) | `for` | Severity | Budget gone when it fires |
 |---|---|---|---|---|---|---|---|
-| `AgentAvailabilityFastBurn` | availability | 14.4 | error ratio > 14.4 % | 1 h / 5 m | 5m | page | 2 % ≈ 12 failed requests |
-| `AgentAvailabilitySlowBurn` | availability | 6 | error ratio > 6 % | 6 h / 30 m | 30m | ticket | 5 % ≈ 30 failed requests |
-| `AgentMessageLatencyFastBurn` | message latency | 14.4 | > 72 % of turns over 4 s | 1 h / 5 m | 5m | page | 2 % ≈ 48 slow turns |
-| `AgentMessageLatencySlowBurn` | message latency | 6 | > 30 % of turns over 4 s | 6 h / 30 m | 30m | ticket | 5 % ≈ 120 slow turns |
-| `AgentFinishLatencyFastBurn` | finish latency | 14.4 | > 14.4 % of finishes over 1 s, and ≥ 5 finishes in 10 m | 10 m / 2 m | 2m | page | about 0.3 % |
+| `AgentAvailabilityFastBurn` | availability | 14.4 | error ratio > 14.4 % | 1 h / 5 m | 5m | critical | 2 % ≈ 12 failed requests |
+| `AgentAvailabilitySlowBurn` | availability | 6 | error ratio > 6 % | 6 h / 30 m | 30m | warning | 5 % ≈ 30 failed requests |
+| `AgentMessageLatencyFastBurn` | message latency | 14.4 | > 72 % of turns over 4 s | 1 h / 5 m | 5m | critical | 2 % ≈ 48 slow turns |
+| `AgentMessageLatencySlowBurn` | message latency | 6 | > 30 % of turns over 4 s | 6 h / 30 m | 30m | warning | 5 % ≈ 120 slow turns |
+| `AgentFinishLatencyFastBurn` | finish latency | 14.4 | > 14.4 % of finishes over 1 s, and ≥ 5 finishes in 10 m | 10 m / 2 m | 2m | critical | about 0.3 % |
 
 - **Long and short windows:** the long window proves the burn is sustained. The short one makes the
   alert resolve soon after the fix, so it stops paging.
