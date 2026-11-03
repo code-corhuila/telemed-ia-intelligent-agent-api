@@ -21,6 +21,7 @@ differ, these pages follow the code, and they say so.
 | Trace context (`traceparent`, `X-Correlation-Id`) and `http.request.completed` | `adapter/in/http/observability/TraceContextFilter` |
 | JSON log line | `app/observability/ContractLogFormatter` (`logging.structured.format.console`) |
 | `agent_requests_total`, `agent_request_duration_seconds` | `app/observability/AgentRequestMetricsFilter` |
+| Spans exported to Jaeger through the platform OTel collector (`OTLP_TRACING_ENDPOINT`, default `http://otel-collector:4318/v1/traces`) | `micrometer-tracing-bridge-otel` + `opentelemetry-exporter-otlp`; child spans `agent.appointments.request` (`HttpAppointments`), `agent.model.request` (`GroqAgentModel`) and `agent.mongodb.transaction` (`ObservedUnitOfWork`) |
 | Trace context in the outbox event | `adapter/out/persistence/mongo/MongoSummaryRepository` + `adapter/observability/CurrentTrace` |
 | Recording and alerting rules, with promtool tests | `telemed-ia-infra-postgres/observability/rules/intelligent-agent.yml`, `tests/prometheus/intelligent-agent.test.yml` |
 | Runbook controls | `PausableStartPreConsultation`, `CircuitBreakingAgentModel`, `MongoClientConfiguration` |
@@ -45,5 +46,5 @@ The rules and their burn-rate scenarios are checked in `telemed-ia-infra-postgre
   `intelligent-agent-api:9086`, evaluates the rules and sends the alerts to its Alertmanager.
 - **The worker and RabbitMQ hops** (outbox relay, `PreConsultationSummaryGenerated` delivery) and the
   summary-freshness SLO need `telemed-ia-worker`, which does not exist yet.
-- **Spans:** the service propagates W3C `traceparent` and writes `trace_id`/`span_id` on every line, but
-  it exports no spans (no OpenTelemetry SDK). A trace is reconstructed from logs by `trace_id`.
+- **Trace storage:** the spans go to the collector and Jaeger of `telemed-ia-infra-postgres`; this
+  repository runs neither. The `trace_id` and `span_id` of every log line are the ids of the span in Jaeger.
