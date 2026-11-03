@@ -1,7 +1,7 @@
 # CP6 — SLIs, SLOs and error budget
 
 All windows are 30 days, rolling. The PromQL reads the metrics in [metrics.md](metrics.md). The
-recording rules in `deploy/prometheus/agent-slo-rules.yml` compute the same ratios over the alert windows.
+recording rules in `telemed-ia-infra-postgres/observability/rules/intelligent-agent.yml` compute the same ratios over the alert windows.
 
 ## SLO 1 — Availability
 
