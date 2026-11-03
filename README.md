@@ -44,7 +44,7 @@ curl http://localhost:9086/actuator/health      # {"status":"UP"}
 - **Logs:** one JSON line per event with `trace_id`, `span_id` and `correlation_id`. The patient's words are never logged.
 - **Traces:** W3C `traceparent` is honoured and echoed, passed to appointment-scheduling-api and stored in the outbox event.
 - **Metrics:** `agent_requests_total` and `agent_request_duration_seconds` on `:9086/actuator/prometheus`.
-- **SLO burn-rate rules:** in `deploy/prometheus/`.
+- **SLO burn-rate rules:** in `telemed-ia-infra-postgres/observability/rules/intelligent-agent.yml`, evaluated by the platform Prometheus.
 - **Runbook controls:**
 
   | Control | Setting |
