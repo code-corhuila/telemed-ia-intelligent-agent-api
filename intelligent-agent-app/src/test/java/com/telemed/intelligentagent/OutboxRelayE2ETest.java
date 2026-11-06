@@ -11,6 +11,7 @@ import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.data.SpanData;
 import org.bson.Document;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.amqp.core.AmqpAdmin;
@@ -49,7 +50,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class OutboxRelayE2ETest {
 
     private static final String QUEUE = "test.agent.pre-consultation-summary-generated";
-    private static final String TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
+    // One trace per test: an event a previous test left pending can still reach this test's queue.
+    private final String traceId = UUID.randomUUID().toString().replace("-", "");
     private static final String REQUEST_SPAN = "00f067aa0ba902b7";
 
     @Autowired
@@ -81,6 +83,11 @@ class OutboxRelayE2ETest {
         TestRabbit.register(registry);
     }
 
+    @BeforeEach
+    void forgetEarlierSpans() {
+        spans.reset();
+    }
+
     @AfterEach
     void cleanUp() {
         admin.deleteQueue(QUEUE);
@@ -99,13 +106,13 @@ class OutboxRelayE2ETest {
 
         PreConsultationSummary summary = finishedInARequest();
 
-        Message message = rabbit.receive(QUEUE, 10_000);
+        Message message = messageOfThisTest();
         assertThat(message).isNotNull();
         JsonNode body = new ObjectMapper().readTree(message.getBody());
         assertThat(body.get("eventType").asText()).isEqualTo("PreConsultationSummaryGenerated");
         assertThat(body.get("payload").get("summaryId").asText()).isEqualTo(summary.id().toString());
         assertThat(body.get("payload").get("appointmentId").asText()).isEqualTo(summary.appointmentId().toString());
-        assertThat(message.getMessageProperties().<String>getHeader("traceparent")).contains(TRACE_ID);
+        assertThat(message.getMessageProperties().<String>getHeader("traceparent")).contains(traceId);
         assertThat(outboxStatus(summary)).isEqualTo("PUBLISHED");
     }
 
@@ -121,9 +128,9 @@ class OutboxRelayE2ETest {
         SpanData publish = exportedPublishSpan().orElseThrow();
         assertThat(publish.getKind()).isEqualTo(SpanKind.PRODUCER);
         assertThat(publish.getParentSpanId()).isEqualTo(REQUEST_SPAN);
-        Message message = rabbit.receive(QUEUE, 10_000);
+        Message message = messageOfThisTest();
         assertThat(message.getMessageProperties().<String>getHeader("traceparent"))
-                .isEqualTo("00-" + TRACE_ID + "-" + publish.getSpanId() + "-01");
+                .isEqualTo("00-" + traceId + "-" + publish.getSpanId() + "-01");
     }
 
     @Test
@@ -137,7 +144,7 @@ class OutboxRelayE2ETest {
 
     /** What /finish leaves behind: the summary and its outbox event, with the request's trace context. */
     private PreConsultationSummary finishedInARequest() {
-        MDC.put(CurrentTrace.TRACE_ID, TRACE_ID);
+        MDC.put(CurrentTrace.TRACE_ID, traceId);
         MDC.put(CurrentTrace.SPAN_ID, REQUEST_SPAN);
         PreConsultationSummary summary = new PreConsultationSummary(UUID.randomUUID(), UUID.randomUUID(),
                 UUID.randomUUID(), UUID.randomUUID(), "Dolor de cabeza", null, null, null, Instant.now());
@@ -160,11 +167,24 @@ class OutboxRelayE2ETest {
         return status;
     }
 
+    /** The message published in this test's trace; any other one is skipped. */
+    private Message messageOfThisTest() {
+        long deadline = System.currentTimeMillis() + 10_000;
+        while (System.currentTimeMillis() < deadline) {
+            Message message = rabbit.receive(QUEUE, 1_000);
+            String traceparent = message == null ? null : message.getMessageProperties().getHeader("traceparent");
+            if (traceparent != null && traceparent.contains(traceId)) {
+                return message;
+            }
+        }
+        return null;
+    }
+
     private Optional<SpanData> exportedPublishSpan() throws InterruptedException {
         for (int attempt = 0; attempt < 50; attempt++) {
             tracerProvider.forceFlush().join(1, TimeUnit.SECONDS);
             Optional<SpanData> span = spans.getFinishedSpanItems().stream()
-                    .filter(item -> item.getTraceId().equals(TRACE_ID))
+                    .filter(item -> item.getTraceId().equals(traceId))
                     .filter(item -> item.getName().equals("agent.events publish"))
                     .findFirst();
             if (span.isPresent()) {
