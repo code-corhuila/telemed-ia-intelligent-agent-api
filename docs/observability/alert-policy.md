@@ -42,4 +42,4 @@ Options, which need a team decision:
 | CPU or memory of the container | They do not mean patients are affected. If they matter, latency or errors show it. |
 | A single 5xx from the AI provider, or one Groq retry | Retries are expected. The symptom alerts fire when patients are affected. |
 | `agent.model.circuit.opened` or `mongodb.unavailable` log lines | They explain a page, they do not cause one. Search them while following the runbook. |
-| Size of `outbox_events` | It belongs to the worker's freshness SLO, which is still planned. |
+| Size of `outbox_events` | It belongs to the summary freshness SLO, which is still planned. Until a consumer binds its queue, pending events are expected. |
