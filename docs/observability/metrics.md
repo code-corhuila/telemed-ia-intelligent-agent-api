@@ -51,4 +51,4 @@ one series per patient and put health data into the monitoring system. Use the l
 | Hop | Metric | Owner |
 |---|---|---|
 | gateway | `gateway_requests_total`, `gateway_request_duration_seconds` | telemed-ia-api-gateway |
-| outbox relay | `agent_outbox_publish_delay_seconds`, `agent_outbox_pending_events` | telemed-ia-worker (does not exist yet) |
+| outbox relay | `agent_outbox_publish_delay_seconds` (`agent_outbox_pending_events` is already exported) | intelligent-agent-api, not built yet |

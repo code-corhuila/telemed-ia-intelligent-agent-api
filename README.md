@@ -18,7 +18,7 @@ professional. It never diagnoses, prescribes or replaces the professional (ADR-0
 
 ```
 intelligent-agent-core/       domain and use cases, plain Java
-intelligent-agent-adapters/   HTTP in; MongoDB and the AI provider out
+intelligent-agent-adapters/   HTTP in; MongoDB, the AI provider and RabbitMQ out
 intelligent-agent-app/        composition root and configuration
 ```
 
@@ -38,11 +38,14 @@ curl http://localhost:9086/actuator/health      # {"status":"UP"}
 | `PORT` / `MANAGEMENT_PORT` | API (8086, inside the `platform` network only; reach it through the gateway) and health (9086, localhost only) ports |
 | `JWT_ISSUER` | issuer of identity-api's tokens |
 | `JWT_PUBLIC_KEY_HOST_FILE` | identity-api's public key (PEM) on the host |
+| `OUTBOX_RELAY_ENABLED` | publish `PreConsultationSummaryGenerated` from agent-db's outbox to RabbitMQ (`true` in deploy, `false` by default) |
+| `RABBITMQ_HOST` / `RABBITMQ_PORT` / `RABBITMQ_USERNAME` / `RABBITMQ_PASSWORD` | the platform broker (`rabbitmq` service of telemed-ia-worker) |
 
 ## Observability
 
 - **Logs:** one JSON line per event with `trace_id`, `span_id` and `correlation_id`. The patient's words are never logged.
 - **Traces:** W3C `traceparent` is honoured and echoed, passed to appointment-scheduling-api and stored in the outbox event. The spans are exported to the platform OTel collector (`OTLP_TRACING_ENDPOINT`), which feeds Jaeger.
+- **Events:** the outbox relay publishes `PreConsultationSummaryGenerated` to the topic exchange `agent.events`, routing key `pre-consultation-summary-generated`, with the ADR-011 envelope and the stored `traceparent` as a header. It is at-least-once: an event is marked `PUBLISHED` only after the broker confirms that a queue took it, so it stays `PENDING` until a consumer binds its queue.
 - **Metrics:** `agent_requests_total` and `agent_request_duration_seconds` on `:9086/actuator/prometheus`.
 - **SLO burn-rate rules:** in `telemed-ia-infra-postgres/observability/rules/intelligent-agent.yml`, evaluated by the platform Prometheus.
 - **Runbook controls:**

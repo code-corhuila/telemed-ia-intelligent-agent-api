@@ -44,7 +44,8 @@ The rules and their burn-rate scenarios are checked in `telemed-ia-infra-postgre
 - **Collection and alerting:** this repository has no Prometheus server, log shipper (Loki) or trace
   backend. The service exposes the data; the platform Prometheus in `telemed-ia-infra-postgres` scrapes
   `intelligent-agent-api:9086`, evaluates the rules and sends the alerts to its Alertmanager.
-- **The worker and RabbitMQ hops** (outbox relay, `PreConsultationSummaryGenerated` delivery) and the
-  summary-freshness SLO need `telemed-ia-worker`, which does not exist yet.
+- **The consumer of `PreConsultationSummaryGenerated`:** the relay in this service publishes it to
+  `agent.events`; appointment-scheduling-api (the consumer in the event catalog) does not bind a queue yet.
+  The summary-freshness SLO also needs a publish-delay metric, which is not built yet.
 - **Trace storage:** the spans go to the collector and Jaeger of `telemed-ia-infra-postgres`; this
   repository runs neither. The `trace_id` and `span_id` of every log line are the ids of the span in Jaeger.
