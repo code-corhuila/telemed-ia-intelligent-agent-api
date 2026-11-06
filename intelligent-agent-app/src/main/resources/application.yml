@@ -36,6 +36,12 @@ management:
     health:
       show-details: never
 
+  # A broker outage must not take the agent out of rotation: PreConsultationSummaryGenerated
+  # waits in agent-db's outbox and the relay publishes it once RabbitMQ is back.
+  health:
+    rabbit:
+      enabled: false
+
   # Week 11 traces: every request is sampled and sent to the platform collector, which feeds Jaeger.
   tracing:
     sampling:
