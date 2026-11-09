@@ -13,8 +13,8 @@ follow `agent-service.yaml` (base `/api/v1/agent`).
 | 4 | portal → gateway → agent | intelligent-agent-api | REST | `POST /conversations/{id}/messages` | `messages` | built |
 | 5 | intelligent-agent-api | AI provider (Groq) | HTTPS | next question / summary | — | built |
 | 6 | portal → gateway → agent | intelligent-agent-api | REST | `POST /conversations/{id}/finish` | `preconsultation_summaries` + `outbox_events`, one transaction (rs0) | built |
-| 7 | telemed-ia-worker | RabbitMQ | AMQP | publish `PreConsultationSummaryGenerated` | — | planned |
-| 8 | medical-consultation-api | RabbitMQ | AMQP | consume it | — | planned |
+| 7 | intelligent-agent-api (outbox relay) | RabbitMQ | AMQP | publish `PreConsultationSummaryGenerated` to `agent.events` | `outbox_events.status` → `PUBLISHED` | built |
+| 8 | appointment-scheduling-api (consumer in the event catalog) | RabbitMQ | AMQP | consume it | — | planned |
 
 ## Sequence
 
@@ -25,15 +25,15 @@ sequenceDiagram
   participant AG as intelligent-agent-api
   participant AI as AI provider
   participant DB as MongoDB intelligent_agent
-  participant W as telemed-ia-worker (planned)
-  participant MQ as RabbitMQ (planned)
+  participant MQ as RabbitMQ agent.events
   P->>GW: POST /conversations/{id}/finish (traceparent, X-Correlation-Id)
   GW->>AG: forward (traceparent)
   AG->>AI: summarize (redacted transcript)
   AG->>DB: transaction: preconsultation_summaries + outbox_events{traceparent}
   AG-->>P: 200 (traceparent, X-Correlation-Id echoed)
-  W->>DB: read pending outbox_events
-  W-)MQ: PreConsultationSummaryGenerated (traceparent header)
+  AG->>DB: relay: read PENDING outbox_events
+  AG-)MQ: PreConsultationSummaryGenerated (traceparent header, span agent.events publish)
+  AG->>DB: relay: status PUBLISHED
 ```
 
 ## How the context travels
@@ -46,8 +46,9 @@ sequenceDiagram
 - **Back to the caller:** the response echoes `traceparent` and `X-Correlation-Id`. The error
   envelope's `traceId` is the correlation id.
 - **Across the async boundary:** the `PreConsultationSummaryGenerated` outbox document stores
-  `traceparent`, which agent-db's validator accepts since `hu-06-010`. The worker must copy it
-  into the RabbitMQ message headers so the consumer continues the same trace.
+  `traceparent`, which agent-db's validator accepts since `hu-06-010`. The relay opens a
+  PRODUCER span `agent.events publish` under it and copies the trace context into the RabbitMQ
+  `traceparent` header, so the consumer continues the same trace. `OutboxRelayE2ETest` checks the header and the span.
   `TracePropagationTest` checks that the `trace_id` sent on `/finish` is the one stored in the event.
 
 ## Differences from the workshop prototype

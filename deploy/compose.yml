@@ -25,6 +25,13 @@ services:
       # appointment-scheduling-api on the platform network; the patient's token is relayed.
       APPOINTMENTS_BASE_URL: ${APPOINTMENTS_BASE_URL:-http://appointment-scheduling-api:8080}
 
+      # HU-06 outbox relay to the platform RabbitMQ (telemed-ia-worker's rabbitmq service).
+      OUTBOX_RELAY_ENABLED: ${OUTBOX_RELAY_ENABLED:-true}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD (the broker user of the platform network)}
+
       # infra-postgres otel-collector on the platform network; it forwards the spans to Jaeger.
       OTLP_TRACING_ENDPOINT: ${OTLP_TRACING_ENDPOINT:-http://otel-collector:4318/v1/traces}
 

@@ -42,8 +42,8 @@ sum(rate(agent_request_duration_seconds_bucket{route="/api/v1/agent/conversation
 
 ## SLO 4 — Summary freshness (planned)
 
-`PreConsultationSummaryGenerated` published within 60 s, 99 %. It needs the outbox relay in
-`telemed-ia-worker`, which does not exist yet. The `traceparent` stored in the event is already in place for it.
+`PreConsultationSummaryGenerated` published within 60 s, 99 %. The outbox relay runs in
+this service (`agent.outbox-relay`); the SLO still needs its publish-delay metric and a consumer. The `traceparent` stored in the event is already in place for it.
 
 ## Traffic estimate (MVP pilot)
 
