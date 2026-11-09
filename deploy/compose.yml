@@ -25,6 +25,9 @@ services:
       # appointment-scheduling-api on the platform network; the patient's token is relayed.
       APPOINTMENTS_BASE_URL: ${APPOINTMENTS_BASE_URL:-http://appointment-scheduling-api:8080}
 
+      # infra-postgres otel-collector on the platform network; it forwards the spans to Jaeger.
+      OTLP_TRACING_ENDPOINT: ${OTLP_TRACING_ENDPOINT:-http://otel-collector:4318/v1/traces}
+
       AGENT_QUESTION_LIMIT: ${AGENT_QUESTION_LIMIT:-8}
       AGENT_MINIMUM_QUESTIONS: ${AGENT_MINIMUM_QUESTIONS:-4}
       # Runbook mitigation 1: set true and recreate the container to pause new pre-consultations.

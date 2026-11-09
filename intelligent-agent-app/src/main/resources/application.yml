@@ -36,6 +36,14 @@ management:
     health:
       show-details: never
 
+  # Week 11 traces: every request is sampled and sent to the platform collector, which feeds Jaeger.
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTLP_TRACING_ENDPOINT:http://otel-collector:4318/v1/traces}
+
 # identity-api signs the tokens; the agent only verifies them with the public key.
 security:
   jwt:
