@@ -4,6 +4,8 @@ import com.telemed.intelligentagent.adapter.out.ai.CircuitBreakingAgentModel;
 import com.telemed.intelligentagent.adapter.out.ai.GroqAgentModel;
 import com.telemed.intelligentagent.adapter.out.ai.ScriptedAgentModel;
 import com.telemed.intelligentagent.application.port.out.AgentModelPort;
+import io.micrometer.observation.ObservationRegistry;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,7 +23,7 @@ public class AgentModelConfiguration {
     }
 
     @Bean
-    AgentModelPort agentModel(AgentProperties properties, Clock clock) {
+    AgentModelPort agentModel(AgentProperties properties, Clock clock, ObjectProvider<ObservationRegistry> registry) {
         AgentProperties.Model model = properties.model();
         return switch (model.provider()) {
             case SCRIPTED -> new ScriptedAgentModel();
@@ -30,7 +32,7 @@ public class AgentModelConfiguration {
                 AgentProperties.Circuit circuit = model.circuit();
                 yield new CircuitBreakingAgentModel(
                         new GroqAgentModel(groq.baseUrl(), groq.apiKey(), groq.model(), groq.timeout(),
-                                groq.attempts(), groq.backoff()),
+                                groq.attempts(), groq.backoff(), registry.getIfAvailable(() -> ObservationRegistry.NOOP)),
                         circuit.failureThreshold(), circuit.openFor(), clock);
             }
         };

@@ -55,7 +55,7 @@ class MetricsEndpointTest {
     void publishesTheBucketsTheSloRulesRead() throws InterruptedException {
         http.getForEntity("http://localhost:" + port + "/api/v1/agent/conversations/x", String.class);
 
-        // deploy/prometheus/agent-slo-rules.yml reads these exact le values (1 s for finish, 4 s for a turn).
+        // The SLO rules in telemed-ia-infra-postgres read these exact le values (1 s for finish, 4 s for a turn).
         assertThat(scrapeOnceRecorded("agent_request_duration_seconds_bucket{").getBody())
                 .containsPattern("agent_request_duration_seconds_bucket\\{[^}]*le=\"1.0\"")
                 .containsPattern("agent_request_duration_seconds_bucket\\{[^}]*le=\"4.0\"");

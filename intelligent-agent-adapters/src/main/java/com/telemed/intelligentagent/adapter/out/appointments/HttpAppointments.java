@@ -7,6 +7,9 @@ import com.telemed.intelligentagent.application.port.out.AppointmentVerification
 import com.telemed.intelligentagent.application.port.out.AppointmentsPort;
 import com.telemed.intelligentagent.domain.model.Appointment;
 import com.telemed.intelligentagent.domain.model.AppointmentStatus;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
+import io.micrometer.observation.transport.RequestReplySenderContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,7 +28,8 @@ import java.util.function.Supplier;
  * appointment-scheduling-api's GET /api/appointments/{id}, called with the
  * patient's own token (token relay): the agent has no privilege of its own
  * over appointments, and that service enforces ownership too. Anything that
- * is not a clear answer fails closed.
+ * is not a clear answer fails closed. Each call is a client span of the request
+ * (week 11 traces), and the appointment service continues the trace under it.
  */
 public class HttpAppointments implements AppointmentsPort {
 
@@ -35,9 +39,16 @@ public class HttpAppointments implements AppointmentsPort {
     private final Duration timeout;
     private final Supplier<String> callerToken;
     private final HttpClient http;
+    private final ObservationRegistry registry;
     private final ObjectMapper json = new ObjectMapper();
 
     public HttpAppointments(String baseUrl, Duration timeout, Supplier<String> callerToken) {
+        this(baseUrl, timeout, callerToken, ObservationRegistry.NOOP);
+    }
+
+    public HttpAppointments(String baseUrl, Duration timeout, Supplier<String> callerToken,
+                            ObservationRegistry registry) {
+        this.registry = registry;
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         this.timeout = timeout;
         this.callerToken = callerToken;
@@ -55,7 +66,29 @@ public class HttpAppointments implements AppointmentsPort {
                 .header("Authorization", "Bearer " + token)
                 .header("Accept", "application/json")
                 .GET();
-        HttpRequest request = withTraceContext(builder).build();
+        withTraceContext(builder);
+        // With a tracer, starting the observation replaces the traceparent with its own client span.
+        RequestReplySenderContext<HttpRequest.Builder, HttpResponse<String>> context =
+                new RequestReplySenderContext<>(HttpRequest.Builder::setHeader);
+        context.setCarrier(builder);
+        context.setRemoteServiceName("appointment-scheduling-api");
+        Observation observation = Observation.createNotStarted("agent.appointments.request", () -> context, registry)
+                .contextualName("GET /api/appointments/{id}")
+                .start();
+        try {
+            Optional<Appointment> appointment = send(builder.build());
+            observation.lowCardinalityKeyValue("outcome", appointment.isPresent() ? "found" : "not_found");
+            return appointment;
+        } catch (AppointmentVerificationUnavailableException e) {
+            observation.lowCardinalityKeyValue("outcome", "unavailable");
+            observation.error(e);
+            throw e;
+        } finally {
+            observation.stop();
+        }
+    }
+
+    private Optional<Appointment> send(HttpRequest request) {
         HttpResponse<String> response;
         try {
             response = http.send(request, HttpResponse.BodyHandlers.ofString());
@@ -77,16 +110,15 @@ public class HttpAppointments implements AppointmentsPort {
      * Week 11 (CP3): the appointment service continues this request's trace, with the
      * span this service opened as the parent.
      */
-    private static HttpRequest.Builder withTraceContext(HttpRequest.Builder builder) {
+    private static void withTraceContext(HttpRequest.Builder builder) {
         String traceparent = CurrentTrace.traceparent();
         if (traceparent != null) {
-            builder.header("traceparent", traceparent);
+            builder.setHeader("traceparent", traceparent);
         }
         String correlationId = CurrentTrace.correlationId();
         if (correlationId != null) {
             builder.header("X-Correlation-Id", correlationId);
         }
-        return builder;
     }
 
     private Appointment toAppointment(String body) {

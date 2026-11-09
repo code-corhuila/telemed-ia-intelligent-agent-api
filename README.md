@@ -42,9 +42,9 @@ curl http://localhost:9086/actuator/health      # {"status":"UP"}
 ## Observability
 
 - **Logs:** one JSON line per event with `trace_id`, `span_id` and `correlation_id`. The patient's words are never logged.
-- **Traces:** W3C `traceparent` is honoured and echoed, passed to appointment-scheduling-api and stored in the outbox event.
+- **Traces:** W3C `traceparent` is honoured and echoed, passed to appointment-scheduling-api and stored in the outbox event. The spans are exported to the platform OTel collector (`OTLP_TRACING_ENDPOINT`), which feeds Jaeger.
 - **Metrics:** `agent_requests_total` and `agent_request_duration_seconds` on `:9086/actuator/prometheus`.
-- **SLO burn-rate rules:** in `deploy/prometheus/`.
+- **SLO burn-rate rules:** in `telemed-ia-infra-postgres/observability/rules/intelligent-agent.yml`, evaluated by the platform Prometheus.
 - **Runbook controls:**
 
   | Control | Setting |

@@ -4,6 +4,11 @@ import com.sun.net.httpserver.HttpServer;
 import com.telemed.intelligentagent.application.port.out.AppointmentVerificationUnavailableException;
 import com.telemed.intelligentagent.domain.model.Appointment;
 import com.telemed.intelligentagent.domain.model.AppointmentStatus;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationHandler;
+import io.micrometer.observation.tck.TestObservationRegistry;
+import io.micrometer.observation.tck.TestObservationRegistryAssert;
+import io.micrometer.observation.transport.SenderContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -97,6 +102,38 @@ class HttpAppointmentsTest {
     }
 
     @Test
+    void opensAChildSpanThatTheAppointmentServiceContinues() {
+        MDC.put("trace_id", "4bf92f3577b34da6a3ce929d0e0e4736");
+        MDC.put("span_id", "00f067aa0ba902b7");
+        String childSpan = "00-4bf92f3577b34da6a3ce929d0e0e4736-b7ad6b7169203331-01";
+        TestObservationRegistry registry = TestObservationRegistry.create();
+        // What the tracer does on start: it injects the new client span into the outgoing request.
+        registry.observationConfig().observationHandler(new ObservationHandler<>() {
+            @Override
+            public void onStart(Observation.Context context) {
+                inject((SenderContext<?>) context, childSpan);
+            }
+
+            @Override
+            public boolean supportsContext(Observation.Context context) {
+                return context instanceof SenderContext<?>;
+            }
+        });
+        HttpAppointments observed = new HttpAppointments("http://127.0.0.1:" + server.getAddress().getPort(),
+                Duration.ofMillis(500), () -> PATIENT_TOKEN, registry);
+        body = appointmentJson("CONFIRMED");
+
+        observed.findById(APPOINTMENT);
+
+        // Jaeger shows the call under the request, and the appointment service's spans under the call.
+        assertThat(traceparents).containsExactly(childSpan);
+        TestObservationRegistryAssert.assertThat(registry)
+                .hasObservationWithNameEqualTo("agent.appointments.request").that()
+                .hasLowCardinalityKeyValue("outcome", "found")
+                .hasBeenStopped();
+    }
+
+    @Test
     void sendsNoTraceHeadersOutsideATracedRequest() {
         body = appointmentJson("CONFIRMED");
 
@@ -148,6 +185,10 @@ class HttpAppointmentsTest {
     private void assertUnavailable() {
         assertThatThrownBy(() -> appointments.findById(APPOINTMENT))
                 .isInstanceOf(AppointmentVerificationUnavailableException.class);
+    }
+
+    private static <C> void inject(SenderContext<C> context, String traceparent) {
+        context.getSetter().set(context.getCarrier(), "traceparent", traceparent);
     }
 
     private static String appointmentJson(String status) {
