@@ -1,6 +1,7 @@
 package com.telemed.intelligentagent.adapter.in.http.observability;
 
 import com.telemed.intelligentagent.adapter.in.http.TraceIds;
+import com.telemed.intelligentagent.adapter.observability.CurrentTrace;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,9 +33,9 @@ public class TraceContextFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         TraceContext trace = TraceContext.from(request.getHeader(TraceContext.HEADER));
         String correlationId = TraceIds.of(request);
-        MDC.put("trace_id", trace.traceId());
-        MDC.put("span_id", trace.spanId());
-        MDC.put("correlation_id", correlationId);
+        MDC.put(CurrentTrace.TRACE_ID, trace.traceId());
+        MDC.put(CurrentTrace.SPAN_ID, trace.spanId());
+        MDC.put(CurrentTrace.CORRELATION_ID, correlationId);
         response.setHeader(TraceContext.HEADER, trace.toHeader());
         response.setHeader(TraceIds.HEADER, correlationId);
         long started = System.nanoTime();
@@ -42,16 +43,17 @@ public class TraceContextFilter extends OncePerRequestFilter {
             chain.doFilter(request, response);
         } finally {
             Object route = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
-            LOG.atInfo()
+            // A 5xx failed the patient and needs attention; a 4xx was the caller's and was answered.
+            (response.getStatus() >= 500 ? LOG.atError() : LOG.atInfo())
                     .addKeyValue("event", "http.request.completed")
                     .addKeyValue("route", route == null ? "unmatched" : route.toString())
                     .addKeyValue("method", request.getMethod())
                     .addKeyValue("status", response.getStatus())
                     .addKeyValue("duration_ms", (System.nanoTime() - started) / 1_000_000)
                     .log("request completed");
-            MDC.remove("trace_id");
-            MDC.remove("span_id");
-            MDC.remove("correlation_id");
+            MDC.remove(CurrentTrace.TRACE_ID);
+            MDC.remove(CurrentTrace.SPAN_ID);
+            MDC.remove(CurrentTrace.CORRELATION_ID);
         }
     }
 }

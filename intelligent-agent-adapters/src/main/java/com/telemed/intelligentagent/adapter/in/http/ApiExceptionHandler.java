@@ -1,6 +1,7 @@
 package com.telemed.intelligentagent.adapter.in.http;
 
 import com.telemed.intelligentagent.adapter.in.http.ApiErrorResponse.FieldError;
+import com.telemed.intelligentagent.application.port.in.PreConsultationsPausedException;
 import com.telemed.intelligentagent.application.port.out.AgentModelUnavailableException;
 import com.telemed.intelligentagent.application.port.out.AppointmentVerificationUnavailableException;
 import com.telemed.intelligentagent.domain.model.AgentDomainException;
@@ -43,14 +44,33 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         if (status == HttpStatus.INTERNAL_SERVER_ERROR) {
             return internalError(exception, request);
         }
+        LOG.atWarn()
+                .addKeyValue("event", "request.rejected")
+                .addKeyValue("error_code", exception.reason().name())
+                .log("request rejected by a pre-consultation rule");
         return error(status, exception.reason().name(), exception.getMessage(), List.of(), request);
     }
 
     @ExceptionHandler({AgentModelUnavailableException.class, AppointmentVerificationUnavailableException.class})
     ResponseEntity<ApiErrorResponse> unavailable(RuntimeException exception, HttpServletRequest request) {
-        LOG.warn("Dependency unavailable: {}", exception.getMessage());
+        LOG.atWarn()
+                .addKeyValue("event", "dependency.unavailable")
+                .addKeyValue("error_code", "SERVICE_UNAVAILABLE")
+                .log("dependency unavailable: {}", exception.getMessage());
         return error(HttpStatus.SERVICE_UNAVAILABLE, "SERVICE_UNAVAILABLE",
                 "The pre-consultation is not available right now. Try again in a moment.", List.of(), request);
+    }
+
+    /** Its own code, so the portal tells the patient the appointment goes on without a pre-consultation. */
+    @ExceptionHandler(PreConsultationsPausedException.class)
+    ResponseEntity<ApiErrorResponse> paused(PreConsultationsPausedException exception, HttpServletRequest request) {
+        LOG.atWarn()
+                .addKeyValue("event", "preconsultation.paused")
+                .addKeyValue("error_code", "PRECONSULTATION_PAUSED")
+                .log("new pre-consultation refused while paused");
+        return error(HttpStatus.SERVICE_UNAVAILABLE, "PRECONSULTATION_PAUSED",
+                "Pre-consultations are paused right now. Your appointment can continue without the pre-consultation.",
+                List.of(), request);
     }
 
     @ExceptionHandler(TokenSubject.InvalidSubjectException.class)
@@ -60,7 +80,11 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiErrorResponse> internalError(Exception exception, HttpServletRequest request) {
-        LOG.error("Unexpected error [traceId={}]", TraceIds.of(request), exception);
+        LOG.atError()
+                .addKeyValue("event", "request.failed")
+                .addKeyValue("error_code", "INTERNAL_ERROR")
+                .setCause(exception)
+                .log("unexpected error");
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Something went wrong.", List.of(),
                 request);
     }

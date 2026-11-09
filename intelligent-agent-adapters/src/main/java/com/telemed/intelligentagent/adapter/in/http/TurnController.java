@@ -7,6 +7,8 @@ import com.telemed.intelligentagent.application.port.in.SendMessageUseCase;
 import com.telemed.intelligentagent.application.port.in.SendMessageUseCase.AgentTurn;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,6 +25,8 @@ import java.util.UUID;
 @RestController
 @RequestMapping(ConversationController.BASE + "/{id}")
 public class TurnController {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TurnController.class);
 
     private final SendMessageUseCase send;
     private final FinishPreConsultationUseCase finish;
@@ -52,6 +56,14 @@ public class TurnController {
                               @RequestHeader("Idempotency-Key") String idempotencyKey,
                               @Valid @RequestBody SendMessageRequest request) {
         AgentTurn turn = send.send(TokenSubject.of(token), id, idempotencyKey, request.content());
+        // The patient's words are clinical data: only their length is logged.
+        LOG.atInfo()
+                .addKeyValue("event", "conversation.message.answered")
+                .addKeyValue("conversation_id", id.toString())
+                .addKeyValue("message_chars", request.content().length())
+                .addKeyValue("turn", turn.conversation().questionsAsked())
+                .addKeyValue("conversation_status", turn.conversation().status().name())
+                .log("agent answered the patient's message");
         return new ReplyResponse(turn.reply().id(), turn.reply().sender().name(), turn.reply().content(),
                 turn.reply().sentAt(), turn.conversation().status().name());
     }
@@ -59,6 +71,10 @@ public class TurnController {
     @PostMapping("/finish")
     public FinishResponse finish(@AuthenticationPrincipal Jwt token, @PathVariable UUID id) {
         UUID patient = TokenSubject.of(token);
+        LOG.atInfo()
+                .addKeyValue("event", "conversation.finish.received")
+                .addKeyValue("conversation_id", id.toString())
+                .log("finish request accepted");
         finish.finish(patient, id);
         return new FinishResponse(ConversationResponse.of(get.get(patient, id)));
     }

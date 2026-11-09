@@ -2,6 +2,7 @@ package com.telemed.intelligentagent.adapter.out.appointments;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.telemed.intelligentagent.adapter.observability.CurrentTrace;
 import com.telemed.intelligentagent.application.port.out.AppointmentVerificationUnavailableException;
 import com.telemed.intelligentagent.application.port.out.AppointmentsPort;
 import com.telemed.intelligentagent.domain.model.Appointment;
@@ -49,12 +50,12 @@ public class HttpAppointments implements AppointmentsPort {
         if (token == null || token.isBlank()) {
             throw unavailable("no caller token to relay");
         }
-        HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl + "/api/appointments/" + appointmentId))
+        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(baseUrl + "/api/appointments/" + appointmentId))
                 .timeout(timeout)
                 .header("Authorization", "Bearer " + token)
                 .header("Accept", "application/json")
-                .GET()
-                .build();
+                .GET();
+        HttpRequest request = withTraceContext(builder).build();
         HttpResponse<String> response;
         try {
             response = http.send(request, HttpResponse.BodyHandlers.ofString());
@@ -70,6 +71,22 @@ public class HttpAppointments implements AppointmentsPort {
             case 403, 404 -> Optional.empty();
             default -> throw unavailable("status " + response.statusCode());
         };
+    }
+
+    /**
+     * Week 11 (CP3): the appointment service continues this request's trace, with the
+     * span this service opened as the parent.
+     */
+    private static HttpRequest.Builder withTraceContext(HttpRequest.Builder builder) {
+        String traceparent = CurrentTrace.traceparent();
+        if (traceparent != null) {
+            builder.header("traceparent", traceparent);
+        }
+        String correlationId = CurrentTrace.correlationId();
+        if (correlationId != null) {
+            builder.header("X-Correlation-Id", correlationId);
+        }
+        return builder;
     }
 
     private Appointment toAppointment(String body) {

@@ -4,6 +4,8 @@ import com.telemed.intelligentagent.application.port.out.SummaryRepository;
 import com.telemed.intelligentagent.domain.model.AgentDomainException;
 import com.telemed.intelligentagent.domain.model.PreConsultationSummary;
 import org.bson.Document;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -28,17 +30,22 @@ public class MongoSummaryRepository implements SummaryRepository {
     static final String COLLECTION = "preconsultation_summaries";
     static final String OUTBOX = "outbox_events";
 
+    private static final Logger LOG = LoggerFactory.getLogger(MongoSummaryRepository.class);
+
     private final MongoTemplate mongo;
     private final TransactionTemplate transaction;
     private final Clock clock;
     private final Supplier<UUID> correlationIds;
+    private final Supplier<String> traceparents;
 
+    /** traceparents gives the W3C trace context of the request being served, or null outside one. */
     public MongoSummaryRepository(MongoTemplate mongo, TransactionTemplate transaction, Clock clock,
-                                  Supplier<UUID> correlationIds) {
+                                  Supplier<UUID> correlationIds, Supplier<String> traceparents) {
         this.mongo = mongo;
         this.transaction = transaction;
         this.clock = clock;
         this.correlationIds = correlationIds;
+        this.traceparents = traceparents;
     }
 
     @Override
@@ -58,10 +65,11 @@ public class MongoSummaryRepository implements SummaryRepository {
 
     @Override
     public void save(PreConsultationSummary summary) {
+        Document event = generatedEvent(summary);
         try {
             transaction.executeWithoutResult(status -> {
                 mongo.insert(toDocument(summary), COLLECTION);
-                mongo.insert(generatedEvent(summary), OUTBOX);
+                mongo.insert(event, OUTBOX);
             });
         } catch (DuplicateKeyException duplicate) {
             String detail = String.valueOf(duplicate.getMessage());
@@ -70,6 +78,13 @@ public class MongoSummaryRepository implements SummaryRepository {
             }
             throw duplicate;
         }
+        // Ids only, as in the event: the summary's clinical content is never logged.
+        LOG.atInfo()
+                .addKeyValue("event", "preconsultation.summary.generated")
+                .addKeyValue("summary_id", summary.id().toString())
+                .addKeyValue("conversation_id", summary.conversationId().toString())
+                .addKeyValue("outbox_event_id", event.getString("_id"))
+                .log("summary and its outbox event written");
     }
 
     private static Document toDocument(PreConsultationSummary summary) {
@@ -88,7 +103,7 @@ public class MongoSummaryRepository implements SummaryRepository {
     /** Ids only: the clinical content never leaves agent-db through the event. */
     private Document generatedEvent(PreConsultationSummary summary) {
         Date generatedAt = Date.from(summary.createdAt());
-        return new Document("_id", UUID.randomUUID().toString())
+        Document event = new Document("_id", UUID.randomUUID().toString())
                 .append("eventType", "PreConsultationSummaryGenerated")
                 .append("aggregateType", "PRECONSULTATION_SUMMARY")
                 .append("aggregateId", summary.id().toString())
@@ -101,6 +116,13 @@ public class MongoSummaryRepository implements SummaryRepository {
                         .append("patientId", summary.patientId().toString())
                         .append("conversationId", summary.conversationId().toString())
                         .append("generatedAt", generatedAt));
+        // Week 11 (CP1): the relay copies it into the broker headers, so the consumer continues the
+        // trace; agent-db accepts it as an optional field (changeset hu-06-010).
+        String traceparent = traceparents.get();
+        if (traceparent != null) {
+            event.append("traceparent", traceparent);
+        }
+        return event;
     }
 
     private static void appendIfPresent(Document document, String field, String value) {
