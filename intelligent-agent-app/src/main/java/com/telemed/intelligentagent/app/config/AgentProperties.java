@@ -20,6 +20,7 @@ public record AgentProperties(
         @DefaultValue("4") @Min(0) @Max(20) int minimumQuestions,
         @DefaultValue @Valid @NotNull Model model,
         @DefaultValue @Valid @NotNull Appointments appointments,
+        @DefaultValue @Valid @NotNull Mongo mongo,
         // Runbook mitigation 1: refuse new pre-consultations while the agent is degraded.
         @DefaultValue("false") boolean preconsultationsPaused
 ) {
@@ -37,6 +38,21 @@ public record AgentProperties(
     ) {
     }
 
+    /** Runbook mitigation 4: how long a request may wait on agent-db before answering 503. */
+    public record Mongo(
+            @DefaultValue("2s") @NotNull Duration serverSelectionTimeout,
+            @DefaultValue("2s") @NotNull Duration connectTimeout,
+            @DefaultValue("5s") @NotNull Duration readTimeout
+    ) {
+
+        // Zero means "wait forever" to the driver, which is what these settings are here to prevent.
+        @AssertTrue(message = "agent-db timeouts must be positive")
+        public boolean isEveryTimeoutPositive() {
+            return serverSelectionTimeout == null || connectTimeout == null || readTimeout == null
+                    || serverSelectionTimeout.isPositive() && connectTimeout.isPositive() && readTimeout.isPositive();
+        }
+    }
+
     public enum Provider {
         SCRIPTED,
         GROQ
@@ -44,8 +60,21 @@ public record AgentProperties(
 
     public record Model(
             @DefaultValue("scripted") @NotNull Provider provider,
-            @DefaultValue @Valid @NotNull Groq groq
+            @DefaultValue @Valid @NotNull Groq groq,
+            @DefaultValue @Valid @NotNull Circuit circuit
     ) {
+    }
+
+    /** Runbook mitigation 3: how many provider failures in a row open the circuit, and for how long. */
+    public record Circuit(
+            @DefaultValue("5") @Min(1) @Max(50) int failureThreshold,
+            @DefaultValue("30s") @NotNull Duration openFor
+    ) {
+
+        @AssertTrue(message = "open-for must be positive")
+        public boolean isOpenForPositive() {
+            return openFor == null || openFor.isPositive();
+        }
     }
 
     public record Groq(
