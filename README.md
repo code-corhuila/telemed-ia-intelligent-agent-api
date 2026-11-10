@@ -8,8 +8,8 @@ professional. It never diagnoses, prescribes or replaces the professional (ADR-0
 
 | Layer | Rule |
 |---|---|
-| Who | Only patients with a token signed by identity-api (RS256, issuer `telemed-ia-identity-and-access`). Every other role gets `403`; anything else is denied. |
-| Which data | The patient is taken from the token, never from the request body. A patient only reaches their own conversations. |
+| Who | A token signed by identity-api (RS256, issuer `telemed-ia-identity-and-access`). The conversations under `/api/v1/agent/**` are for `PATIENT` only; `GET /api/v1/agent/preconsultations` is for `PROFESSIONAL` only, the professional who attends the appointment (DEC-014). Any other role gets `403`; any other path is denied. |
+| Which data | The patient is taken from the token, never from the request body. A patient only reaches their own conversations and never the summary; a professional only reads the summary of an appointment they attend. |
 | Which appointment | One pre-consultation per appointment, and none without one. |
 | Keys | The service holds identity-api's **public** key only: it verifies tokens, never issues them. |
 | Operations | Health and info on a separate management port, published only on localhost; no other actuator endpoint. The container runs as an unprivileged user. |
