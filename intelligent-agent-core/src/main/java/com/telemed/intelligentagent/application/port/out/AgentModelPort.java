@@ -18,6 +18,15 @@ public interface AgentModelPort {
     /** The structured pre-consultation summary, built from what the patient reported. */
     SummaryDraft summarize(List<Turn> transcript);
 
+    /**
+     * DEC-019: the reason for the visit, as a short paragraph addressed to the patient, written
+     * only from the patient's own (redacted) pre-consultation fields. Null when this model writes
+     * no free text (the scripted model): the caller then uses its template.
+     */
+    default String reasonForVisit(SummaryDraft patientReport) {
+        return null;
+    }
+
     record Turn(Sender sender, String text) {
     }
 
