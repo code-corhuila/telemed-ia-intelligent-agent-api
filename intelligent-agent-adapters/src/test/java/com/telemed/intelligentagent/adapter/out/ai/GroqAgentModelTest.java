@@ -100,6 +100,23 @@ class GroqAgentModelTest {
     }
 
     @Test
+    void writesTheReasonForVisitFromThePatientsFieldsOnly() {
+        contents.add("{\"reasonForVisit\":\"Nos contaste que te duele la cabeza.\"}");
+
+        String paragraph = model.reasonForVisit(new SummaryDraft("Dolor de cabeza", "Dos días", null, null));
+
+        assertThat(paragraph).isEqualTo("Nos contaste que te duele la cabeza.");
+        JsonNode request = requests.get(0);
+        assertThat(request.at("/messages/0/content").asText()).isEqualTo(AgentInstructions.REASON_FOR_VISIT);
+        assertThat(request.at("/messages/1/role").asText()).isEqualTo("user");
+        assertThat(request.at("/messages/1/content").asText())
+                .contains("Dolor de cabeza", "Dos días")
+                .doesNotContain("null");
+        assertThat(request.get("messages")).hasSize(2);
+        assertThat(request.at("/response_format/json_schema/strict").asBoolean()).isTrue();
+    }
+
+    @Test
     void leavesRoomForTheModelsReasoningBeforeItsAnswer() {
         contents.add("{\"message\":\"¿Desde cuándo?\",\"enoughInformation\":false}");
         contents.add("{\"consultationReason\":\"Dolor\",\"evolutionTime\":null,"

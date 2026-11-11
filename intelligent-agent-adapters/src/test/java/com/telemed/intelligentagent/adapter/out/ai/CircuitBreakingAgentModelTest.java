@@ -40,6 +40,19 @@ class CircuitBreakingAgentModelTest {
     }
 
     @Test
+    void passesTheReasonForVisitThroughAndCountsItsFailures() {
+        AgentModelPort.SummaryDraft report = new AgentModelPort.SummaryDraft("headache", null, null, null);
+        assertThat(model.reasonForVisit(report)).isEqualTo("you told us about a headache");
+
+        provider.failing = true;
+        for (int i = 0; i < 3; i++) {
+            assertThatThrownBy(() -> model.reasonForVisit(report)).isInstanceOf(AgentModelUnavailableException.class);
+        }
+        assertThatThrownBy(() -> model.nextTurn(TRANSCRIPT)).isInstanceOf(AgentModelUnavailableException.class);
+        assertThat(provider.calls).isEqualTo(4);
+    }
+
+    @Test
     void opensAfterConsecutiveFailuresAndStopsCallingTheProvider() {
         provider.failing = true;
         failThreeTimes();
@@ -135,6 +148,12 @@ class CircuitBreakingAgentModelTest {
         public SummaryDraft summarize(List<Turn> transcript) {
             answer();
             return new SummaryDraft("headache", null, null, null);
+        }
+
+        @Override
+        public String reasonForVisit(SummaryDraft patientReport) {
+            answer();
+            return "you told us about a headache";
         }
 
         private void answer() {
