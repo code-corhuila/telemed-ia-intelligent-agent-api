@@ -11,6 +11,8 @@ import com.telemed.intelligentagent.application.port.out.ConversationRepository;
 import com.telemed.intelligentagent.application.port.out.IdempotencyRecords;
 import com.telemed.intelligentagent.application.port.out.MessageRepository;
 import com.telemed.intelligentagent.application.port.out.SummaryRepository;
+import com.telemed.intelligentagent.application.port.in.GetPreConsultationReportUseCase;
+import com.telemed.intelligentagent.application.service.PreConsultationReportService;
 import com.telemed.intelligentagent.application.port.out.UnitOfWork;
 import com.telemed.intelligentagent.application.service.FinishPreConsultationService;
 import com.telemed.intelligentagent.application.service.GetPreConsultationService;
@@ -60,6 +62,13 @@ public class UseCaseConfiguration {
                                                        PreConsultationSummarizer summarizer, UnitOfWork unitOfWork,
                                                        Clock clock) {
         return new FinishPreConsultationService(conversations, messages, summaries, summarizer, unitOfWork, clock);
+    }
+
+    /** DEC-019: the reason for the visit for the patient's consultation PDF. */
+    @Bean
+    GetPreConsultationReportUseCase getPreConsultationReportUseCase(SummaryRepository summaries,
+                                                                    AgentModelPort model) {
+        return new PreConsultationReportService(summaries, model);
     }
 
     @Bean

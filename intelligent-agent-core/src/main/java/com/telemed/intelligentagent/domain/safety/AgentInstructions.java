@@ -44,6 +44,8 @@ public final class AgentInstructions {
             Include no diagnosis, no medication advice and no treatment.
             """;
 
+    public static final String REASON_FOR_VISIT = "";
+
     private AgentInstructions() {
     }
 }
