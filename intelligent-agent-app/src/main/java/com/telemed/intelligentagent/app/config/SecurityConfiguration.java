@@ -1,8 +1,10 @@
 package com.telemed.intelligentagent.app.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.telemed.intelligentagent.adapter.in.http.InternalPreConsultationReportController;
 import com.telemed.intelligentagent.adapter.in.http.security.ApiErrorSecurityHandlers;
 import jakarta.servlet.DispatcherType;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest;
 import org.springframework.boot.actuate.health.HealthEndpoint;
 import org.springframework.boot.actuate.info.InfoEndpoint;
@@ -10,34 +12,44 @@ import org.springframework.boot.actuate.metrics.export.prometheus.PrometheusScra
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.authorization.AuthorizationManager;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyFactory;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.Arrays;
 import java.util.Base64;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Least privilege at the door: stateless, only identity-api's RS256 tokens,
- * only the PATIENT role on the agent's API, everything else denied.
+ * only the PATIENT role on the agent's API (the PROFESSIONAL on the summary, allowed service
+ * clients on /internal/preconsultation-reports), everything else denied.
  */
 @Configuration
 @EnableConfigurationProperties(JwtProperties.class)
 public class SecurityConfiguration {
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http, JwtDecoder jwtDecoder, ObjectMapper objectMapper)
+    SecurityFilterChain securityFilterChain(HttpSecurity http, JwtDecoder jwtDecoder, ObjectMapper objectMapper,
+                                            @Value("${security.agent-report.clients:}") String reportClients)
             throws Exception {
         ApiErrorSecurityHandlers handlers = new ApiErrorSecurityHandlers(objectMapper);
 
@@ -54,6 +66,9 @@ public class SecurityConfiguration {
                         .requestMatchers("/api/v1/agent/preconsultations", "/api/v1/agent/preconsultations/**")
                         .hasRole("PROFESSIONAL")
                         .requestMatchers("/api/v1/agent/**").hasRole("PATIENT")
+                        // DEC-019: service-to-service, only the allowed clients' SERVICE tokens.
+                        .requestMatchers(InternalPreConsultationReportController.PATH)
+                        .access(serviceClients(reportClients))
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(resourceServer -> resourceServer
                         .jwt(jwt -> jwt.decoder(jwtDecoder).jwtAuthenticationConverter(roleConverter()))
@@ -75,6 +90,21 @@ public class SecurityConfiguration {
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
                 JwtValidators.createDefaultWithIssuer(properties.issuer())));
         return decoder;
+    }
+
+    /** A SERVICE token whose subject (the client id) is one of the configured clients. */
+    private static AuthorizationManager<RequestAuthorizationContext> serviceClients(String configured) {
+        Set<String> clients = Arrays.stream(configured.split(","))
+                .map(String::strip)
+                .filter(client -> !client.isEmpty())
+                .collect(Collectors.toUnmodifiableSet());
+        return (authentication, context) -> {
+            Authentication caller = authentication.get();
+            boolean allowed = caller instanceof JwtAuthenticationToken token
+                    && token.getAuthorities().stream().anyMatch(a -> "ROLE_SERVICE".equals(a.getAuthority()))
+                    && clients.contains(token.getToken().getSubject());
+            return new AuthorizationDecision(allowed);
+        };
     }
 
     /** identity-api puts the role in a single "role" claim (PATIENT, PROFESSIONAL, ADMIN). */

@@ -69,6 +69,9 @@ security:
   jwt:
     issuer: ${JWT_ISSUER:telemed-ia-identity-and-access}
     public-key-file: ${JWT_PUBLIC_KEY_FILE:}
+  # DEC-019: service clients (identity SERVICE tokens) allowed to read the reason for the visit.
+  agent-report:
+    clients: ${AGENT_REPORT_CLIENTS:document-generation}
 
 # The scripted model needs no key; Groq needs GROQ_API_KEY, only ever from the environment.
 agent:

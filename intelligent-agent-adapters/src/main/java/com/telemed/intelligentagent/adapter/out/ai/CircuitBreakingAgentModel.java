@@ -47,6 +47,11 @@ public class CircuitBreakingAgentModel implements AgentModelPort {
         return call(() -> provider.summarize(transcript));
     }
 
+    @Override
+    public String reasonForVisit(SummaryDraft patientReport) {
+        return call(() -> provider.reasonForVisit(patientReport));
+    }
+
     // The provider is called outside the lock, so a slow call never blocks the others.
     private <T> T call(Supplier<T> action) {
         admit();

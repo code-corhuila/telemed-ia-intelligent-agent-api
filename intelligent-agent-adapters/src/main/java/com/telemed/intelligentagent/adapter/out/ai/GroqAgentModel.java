@@ -40,6 +40,7 @@ public class GroqAgentModel implements AgentModelPort {
     // gpt-oss reasons first within the same budget (measured up to ~300 tokens on a turn).
     private static final int TURN_MAX_TOKENS = 1024;
     private static final int SUMMARY_MAX_TOKENS = 1536;
+    private static final int REASON_MAX_TOKENS = 1024;
 
     private final ObjectMapper json = new ObjectMapper();
     private final HttpClient http;
@@ -97,6 +98,30 @@ public class GroqAgentModel implements AgentModelPort {
                 SUMMARY_MAX_TOKENS);
         return new SummaryDraft(text(summary, "consultationReason"), text(summary, "evolutionTime"),
                 text(summary, "detailedSymptoms"), text(summary, "relevantHistory"));
+    }
+
+    /** DEC-019: one user message with the patient's own fields; absent ones are left out. */
+    @Override
+    public String reasonForVisit(SummaryDraft patientReport) {
+        StringBuilder fields = new StringBuilder();
+        field(fields, "Motivo de consulta", patientReport.consultationReason());
+        field(fields, "Tiempo de evolución", patientReport.evolutionTime());
+        field(fields, "Síntomas", patientReport.detailedSymptoms());
+        field(fields, "Antecedentes", patientReport.relevantHistory());
+
+        ObjectNode schema = objectSchema();
+        schema.with("properties").set("reasonForVisit", json.createObjectNode().put("type", "string"));
+        schema.withArray("required").add("reasonForVisit");
+        JsonNode reply = complete(AgentInstructions.REASON_FOR_VISIT,
+                List.of(new Turn(Sender.PATIENT, fields.toString().strip())), "reason_for_visit", schema,
+                REASON_MAX_TOKENS);
+        return text(reply, "reasonForVisit");
+    }
+
+    private static void field(StringBuilder fields, String label, String value) {
+        if (value != null && !value.isBlank()) {
+            fields.append(label).append(": ").append(value.strip()).append('\n');
+        }
     }
 
     private JsonNode complete(String instructions, List<Turn> transcript, String schemaName, ObjectNode schema,
