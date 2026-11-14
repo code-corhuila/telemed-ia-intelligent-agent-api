@@ -1,0 +1,66 @@
+services:
+  intelligent-agent-api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+
+    # Only the gateway is published (Anexo G 5.6.1): patients reach the API through it.
+    expose:
+      - "8086"
+    ports:
+      # Health only from this machine.
+      - "127.0.0.1:${MANAGEMENT_PORT:-9086}:9086"
+
+    environment:
+      PORT: 8086
+      MANAGEMENT_PORT: 9086
+
+      JWT_ISSUER: ${JWT_ISSUER:-telemed-ia-identity-and-access}
+      # Path inside the container: the agent only verifies tokens.
+      JWT_PUBLIC_KEY_FILE: /run/secrets/jwt-public.pem
+
+      # agent-db as intelligent_agent_app; infra-mongo's mongo is reachable on the platform network.
+      MONGODB_URI: ${MONGODB_URI:?Set MONGODB_URI}
+
+      # appointment-scheduling-api on the platform network; the patient's token is relayed.
+      APPOINTMENTS_BASE_URL: ${APPOINTMENTS_BASE_URL:-http://appointment-scheduling-api:8080}
+
+      # HU-06 outbox relay to the platform RabbitMQ (telemed-ia-worker's rabbitmq service).
+      OUTBOX_RELAY_ENABLED: ${OUTBOX_RELAY_ENABLED:-true}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD (the broker user of the platform network)}
+
+      # infra-postgres otel-collector on the platform network; it forwards the spans to Jaeger.
+      OTLP_TRACING_ENDPOINT: ${OTLP_TRACING_ENDPOINT:-http://otel-collector:4318/v1/traces}
+
+      AGENT_QUESTION_LIMIT: ${AGENT_QUESTION_LIMIT:-8}
+      AGENT_MINIMUM_QUESTIONS: ${AGENT_MINIMUM_QUESTIONS:-4}
+      # Runbook mitigation 1: set true and recreate the container to pause new pre-consultations.
+      AGENT_PRECONSULTATIONS_PAUSED: ${AGENT_PRECONSULTATIONS_PAUSED:-false}
+      # scripted (no key) or groq (needs GROQ_API_KEY from the gitignored .env).
+      AGENT_MODEL_PROVIDER: ${AGENT_MODEL_PROVIDER:-scripted}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
+      # Runbook mitigation 3: provider failures in a row before answering 503 at once, and for how long.
+      AGENT_MODEL_CIRCUIT_FAILURE_THRESHOLD: ${AGENT_MODEL_CIRCUIT_FAILURE_THRESHOLD:-5}
+      AGENT_MODEL_CIRCUIT_OPEN_FOR: ${AGENT_MODEL_CIRCUIT_OPEN_FOR:-30s}
+      # DEC-019: service clients allowed to read /internal/preconsultation-reports.
+      AGENT_REPORT_CLIENTS: ${AGENT_REPORT_CLIENTS:-document-generation}
+      # Runbook mitigation 4: bounded waits on agent-db.
+      MONGODB_SERVER_SELECTION_TIMEOUT: ${MONGODB_SERVER_SELECTION_TIMEOUT:-2s}
+      MONGODB_CONNECT_TIMEOUT: ${MONGODB_CONNECT_TIMEOUT:-2s}
+      MONGODB_READ_TIMEOUT: ${MONGODB_READ_TIMEOUT:-5s}
+
+    volumes:
+      - ${JWT_PUBLIC_KEY_HOST_FILE:?Set JWT_PUBLIC_KEY_HOST_FILE}:/run/secrets/jwt-public.pem:ro
+
+    # Shared network: the API gateway reaches this service as intelligent-agent-api:8086.
+    networks:
+      - platform
+
+networks:
+  platform:
+    external: true
+    name: platform

@@ -1,0 +1,117 @@
+spring:
+  application:
+    name: telemed-ia-intelligent-agent-api
+
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+  # agent-db as intelligent_agent_app (least privilege); required, never defaulted.
+  data:
+    mongodb:
+      uri: ${MONGODB_URI}
+
+  # HU-06: the outbox relay publishes to the platform RabbitMQ. Confirms, returns and
+  # mandatory let an event count as published only when a queue took it.
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:}
+    virtual-host: ${RABBITMQ_VIRTUAL_HOST:/}
+    connection-timeout: ${RABBITMQ_CONNECTION_TIMEOUT:5s}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+
+server:
+  port: ${PORT:8086}
+  shutdown: graceful
+
+  tomcat:
+    connection-timeout: ${HTTP_CONNECTION_TIMEOUT:5s}
+    keep-alive-timeout: ${HTTP_KEEP_ALIVE_TIMEOUT:60s}
+    max-keep-alive-requests: ${HTTP_MAX_KEEP_ALIVE_REQUESTS:100}
+    # Week 11 saturation signal (CP4): tomcat_threads_busy_threads against tomcat_threads_config_max_threads.
+    mbeanregistry:
+      enabled: true
+
+# Health lives on its own port, never on the public one, and nothing else is exposed.
+management:
+  server:
+    port: ${MANAGEMENT_PORT:9086}
+
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+
+  endpoint:
+    health:
+      show-details: never
+
+  # A broker outage must not take the agent out of rotation: PreConsultationSummaryGenerated
+  # waits in agent-db's outbox and the relay publishes it once RabbitMQ is back.
+  health:
+    rabbit:
+      enabled: false
+
+  # Week 11 traces: every request is sampled and sent to the platform collector, which feeds Jaeger.
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTLP_TRACING_ENDPOINT:http://otel-collector:4318/v1/traces}
+
+# identity-api signs the tokens; the agent only verifies them with the public key.
+security:
+  jwt:
+    issuer: ${JWT_ISSUER:telemed-ia-identity-and-access}
+    public-key-file: ${JWT_PUBLIC_KEY_FILE:}
+  # DEC-019: service clients (identity SERVICE tokens) allowed to read the reason for the visit.
+  agent-report:
+    clients: ${AGENT_REPORT_CLIENTS:document-generation}
+
+# The scripted model needs no key; Groq needs GROQ_API_KEY, only ever from the environment.
+agent:
+  question-limit: ${AGENT_QUESTION_LIMIT:8}
+  # Questions the agent asks before the model may close, whatever it says.
+  minimum-questions: ${AGENT_MINIMUM_QUESTIONS:4}
+  # Runbook mitigation 1: true refuses new pre-consultations (503 PRECONSULTATION_PAUSED); a restart applies it.
+  preconsultations-paused: ${AGENT_PRECONSULTATIONS_PAUSED:false}
+  # HU-06: PreConsultationSummaryGenerated leaves agent-db's outbox for agent.events. Off unless
+  # OUTBOX_RELAY_ENABLED=true, so tests and tools never publish by accident.
+  outbox-relay:
+    enabled: ${OUTBOX_RELAY_ENABLED:false}
+    interval: ${OUTBOX_RELAY_INTERVAL:PT5S}
+    batch-size: ${OUTBOX_RELAY_BATCH_SIZE:10}
+    confirm-timeout: ${OUTBOX_RELAY_CONFIRM_TIMEOUT:PT5S}
+  # Unset: no pre-consultation can start, as no appointment can be verified.
+  appointments:
+    base-url: ${APPOINTMENTS_BASE_URL:}
+    timeout: ${APPOINTMENTS_TIMEOUT:3s}
+  # Runbook mitigation 4: bounded waits on agent-db, so a stalled database answers 503 in seconds.
+  mongo:
+    server-selection-timeout: ${MONGODB_SERVER_SELECTION_TIMEOUT:2s}
+    connect-timeout: ${MONGODB_CONNECT_TIMEOUT:2s}
+    read-timeout: ${MONGODB_READ_TIMEOUT:5s}
+  model:
+    provider: ${AGENT_MODEL_PROVIDER:scripted}
+    groq:
+      base-url: ${GROQ_BASE_URL:https://api.groq.com/openai/v1}
+      api-key: ${GROQ_API_KEY:}
+      model: ${GROQ_MODEL:openai/gpt-oss-20b}
+      timeout: ${GROQ_TIMEOUT:20s}
+      attempts: ${GROQ_ATTEMPTS:3}
+      backoff: ${GROQ_BACKOFF:300ms}
+    # Runbook mitigation 3: after this many provider failures in a row, answer 503 at once for open-for.
+    circuit:
+      failure-threshold: ${AGENT_MODEL_CIRCUIT_FAILURE_THRESHOLD:5}
+      open-for: ${AGENT_MODEL_CIRCUIT_OPEN_FOR:30s}
+
+# Week 11 log contract (CP2): one JSON line per event with trace_id, span_id and correlation_id.
+logging:
+  structured:
+    format:
+      console: com.telemed.intelligentagent.app.observability.ContractLogFormatter
