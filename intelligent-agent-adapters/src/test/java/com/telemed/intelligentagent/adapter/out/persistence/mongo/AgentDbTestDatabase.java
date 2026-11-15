@@ -1,0 +1,54 @@
+package com.telemed.intelligentagent.adapter.out.persistence.mongo;
+
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoClients;
+import org.bson.Document;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.testcontainers.containers.MongoDBContainer;
+
+/**
+ * A single-node replica set (as infra-mongo runs) with agent-db's unique
+ * indexes (changesets hu-06-004 and hu-06-009), which the adapters rely on.
+ */
+final class AgentDbTestDatabase {
+
+    static final MongoDBContainer MONGO = new MongoDBContainer("mongo:8.0.32");
+
+    private static MongoClient client;
+
+    private AgentDbTestDatabase() {
+    }
+
+    static synchronized MongoTemplate freshTemplate() {
+        if (!MONGO.isRunning()) {
+            MONGO.start();
+            client = MongoClients.create(MONGO.getReplicaSetUrl());
+        }
+        MongoTemplate template = new MongoTemplate(client, "intelligent_agent");
+        template.getDb().drop();
+        template.getDb().runCommand(Document.parse("""
+                {"createIndexes":"conversations","indexes":[
+                  {"key":{"patientId":1},"name":"uq_conversations_active_patient","unique":true,
+                   "partialFilterExpression":{"status":"ACTIVE"}},
+                  {"key":{"appointmentId":1},"name":"uq_conversations_appointment","unique":true,
+                   "partialFilterExpression":{"appointmentId":{"$type":"string"}}}]}"""));
+        template.getDb().runCommand(Document.parse("""
+                {"createIndexes":"messages","indexes":[
+                  {"key":{"conversationId":1,"timestamp":1},"name":"idx_messages_conversation_timestamp"},
+                  {"key":{"conversationId":1,"sender":1,"idempotencyKey":1},
+                   "name":"uq_messages_conversation_sender_idempotency","unique":true}]}"""));
+        template.getDb().runCommand(Document.parse("""
+                {"createIndexes":"preconsultation_summaries","indexes":[
+                  {"key":{"conversationId":1},"name":"uq_summaries_conversation","unique":true},
+                  {"key":{"appointmentId":1},"name":"uq_summaries_appointment","unique":true,
+                   "partialFilterExpression":{"appointmentId":{"$type":"string"}}}]}"""));
+        template.getDb().runCommand(Document.parse("""
+                {"createIndexes":"idempotency_records","indexes":[
+                  {"key":{"principalId":1,"operation":1,"key":1},"name":"uq_idempotency_principal_operation_key",
+                   "unique":true}]}"""));
+        template.getDb().runCommand(Document.parse("""
+                {"createIndexes":"outbox_events","indexes":[
+                  {"key":{"aggregateId":1,"eventType":1},"name":"uq_outbox_summary_event","unique":true}]}"""));
+        return template;
+    }
+}
